@@ -31,7 +31,11 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'hello_world = crazyflo_planner.hello_world:main'
+            'hello_world = crazyflo_planner.hello_world:main',
+            'arming = crazyflo_planner.arming:main',
+            'set_param = crazyflo_planner.set_param:main',
+            'figure8 = crazyflo_planner.figure8:main',
+            'multi_trajectory = crazyflo_planner.multi_trajectory:main',
         ],
     },
 )

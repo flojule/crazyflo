@@ -1,0 +1,25 @@
+week1:
+DONE: read documentation
+DONE: setup crazyswarm2
+
+week2:
+TODO: create trajectory offline and send to several drones
+TODO: get thrust feedback along trajectory
+TODO: create rigid payload attached to drone
+TODO: create mass-spring-damper payload
+
+week3:
+TODO: initialize trajectory testing on real hardware
+
+week4:
+
+week5:
+
+week6:
+
+week7:
+
+week8:
+
+
+
