@@ -11,12 +11,22 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
-            'launch/launch.py',
-            'launch/launch.xml']),
+            'launch/launch.xml',
+            'launch/sim.launch.py',
+            'launch/real.launch.py',
+        ]),
         ('share/' + package_name + '/config', [
             'config/crazyflies.yaml',
             'config/motion_capture.yaml',
-            'config/config.rviz']),
+            'config/config.rviz',
+        ]),
+        ('share/' + package_name + '/data', [
+            'data/figure8.csv',
+        ]),
+        # ('share/' + package_name + '/data/multi_trajectory', [
+        #     'data/multi_trajectory/traj_1.csv',
+        #     'data/multi_trajectory/traj_2.csv',
+        # ]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -31,11 +41,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'hello_world = crazyflo_planner.hello_world:main',
-            'arming = crazyflo_planner.arming:main',
-            'set_param = crazyflo_planner.set_param:main',
-            'figure8 = crazyflo_planner.figure8:main',
-            'multi_trajectory = crazyflo_planner.multi_trajectory:main',
+            'mission = crazyflo_planner.mission:main',
+            'payload = crazyflo_planner.payload:main',
         ],
+        
     },
 )

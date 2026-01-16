@@ -3,6 +3,12 @@ source install/setup.bash
 source ~/winter-project/venvs/crazyswarm2/bin/activate
 deactivate
 
+source ~/winter-project/venvs/cfclientpython/bin/activate
+cfclient
+
+export AMENT_PYTHON_EXECUTABLE="$(which python3)"
+export PYTHON_EXECUTABLE="$(which python3)"
+
 
 ros2 launch crazyflo_planner launch.py
 ros2 service call /all/takeoff crazyflie_interfaces/srv/Takeoff "{group_mask: 0, height: 0.5, duration: {sec: 2, nanosec: 0}}"

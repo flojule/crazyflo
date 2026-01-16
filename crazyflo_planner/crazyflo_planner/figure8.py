@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from ament_index_python import get_package_share_directory
 from crazyflie_py import Crazyswarm
 from crazyflie_py.uav_trajectory import Trajectory
 import numpy as np
@@ -13,7 +14,9 @@ def main():
     allcfs = swarm.allcfs
 
     traj1 = Trajectory()
-    traj1.loadcsv(Path(__file__).parent / 'data/figure8.csv')
+    csv_path = Path(get_package_share_directory(
+        'crazyflo_planner')) / 'data' / 'figure8.csv'
+    traj1.loadcsv(csv_path)
 
     # enable logging
     allcfs.setParam('usd.logging', 1)
@@ -33,8 +36,8 @@ def main():
 
         allcfs.startTrajectory(0, timescale=TIMESCALE)
         timeHelper.sleep(traj1.duration * TIMESCALE + 2.0)
-        # allcfs.startTrajectory(0, timescale=TIMESCALE, reverse=True)
-        # timeHelper.sleep(traj1.duration * TIMESCALE + 2.0)
+        allcfs.startTrajectory(0, timescale=TIMESCALE, reverse=True)
+        timeHelper.sleep(traj1.duration * TIMESCALE + 2.0)
 
         allcfs.land(targetHeight=0.06, duration=2.0)
         timeHelper.sleep(3.0)

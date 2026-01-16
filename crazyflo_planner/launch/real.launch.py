@@ -36,9 +36,10 @@ def generate_launch_description():
                 launch_arguments={
                     'crazyflies_yaml_file': crazyflies_yaml_path,
                     'motion_capture_yaml_file': motion_capture_yaml_path,
-                    'backend': 'sim',
+                    'backend': 'cpp',
                     'rviz_config_file': rviz_config_path,
                     'rviz': 'True',
+                    'gui': 'False',
                 }.items(),
             ),
         ]

@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
-    <arg name="rviz_config" default="$(find-pkg-share crazyflo_planner)/config/config.rviz" description="RViz config file"/>
 
     <!-- crazyflie -->
     <include file="$(find-pkg-share crazyflie)/launch/launch.py" >
         <arg name="backend" value="sim"/>
+        <arg name="crazyflies_yaml_file" value="$(find-pkg-share crazyflo_planner)/config/crazyflies.yaml"/>
+        <arg name="motion_capture_yaml_file" value="$(find-pkg-share crazyflo_planner)/config/motion_capture.yaml"/>
+        <arg name="rviz_config_file" value="$(find-pkg-share crazyflo_planner)/config/config.rviz"/>
+        <arg name="rviz" value="True"/>
+        <arg name="gui" value="False"/>
     </include>
 
-    <!-- rviz -->
-    <!-- <node pkg="rviz2" exec="rviz2" args="-d $(var rviz_config)" >
-        <param name="use_sim_time" value="true"/>
-    </node> -->
+    <!-- crazyflie_planner -->
+    <!-- <node pkg="crazyflo_planner" exec="mission" name="mission" output="screen"/> -->
+
+    <!-- payload -->
+    <node pkg="crazyflo_planner" exec="payload" name="payload" output="screen"/>
 </launch>
