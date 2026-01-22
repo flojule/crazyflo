@@ -1,0 +1,19 @@
+payload_planner_node:
+  ros__parameters:
+    world_frame: "world"
+    rate_hz: 50.0
+
+    payload_start: [0.0, 0.0, 1.0]
+    payload_goal:  [2.0, 0.0, 1.0]
+
+    max_velocity: 0.5
+    max_acceleration: 1.0
+    max_jerk: 2.0
+    max_snap: 5.0
+
+    cable_length: 1.0
+    elevation_deg: 35.0
+    heading_deg: 0.0
+    attach_offsets: [0.15, 0.0, 0.0,
+                     -0.075, 0.1299, 0.0,
+                     -0.075, -0.1299, 0.0]

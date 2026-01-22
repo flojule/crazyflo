@@ -1,24 +1,41 @@
 # from crazyflie_py import Crazyswarm
+from enum import Enum, auto
 from rclpy.node import Node
 import rclpy
 from visualization_msgs.msg import Marker
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy
 from tf2_ros import TransformBroadcaster, TransformListener, Buffer, TransformException
 import numpy as np
-from geometry_msgs.msg import Pose, TransformStamped
+from geometry_msgs.msg import Pose, TransformStamped, PoseStamped
+from std_srvs.srv import Empty
 
 
-class Payload(Node):
+class PayloadState(Enum):
+    """Payload attachment state."""
+
+    DETACHED = auto()
+    ATTACHED = auto()
+
+
+class PayloadSim(Node):
+    """Simulate payload position based on drone positions and cable length."""
+
     def __init__(self):
-        super().__init__('payload_publisher')
+        super().__init__('payload_sim_node')
 
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        self.get_logger().info('Starting payload simulation node...')
+
+        self.declare_parameter('rate_hz', 200.0)
+        rate_hz = self.get_parameter(
+            'rate_hz').get_parameter_value().double_value
+        self.timer = self.create_timer(1.0 / rate_hz, self.timer_callback)
 
         self.declare_parameter('cable_length', 1.0)
         self.cable_length = self.get_parameter(
             'cable_length').get_parameter_value().double_value
 
         self.payload_pose = None
+        self.payload_state = PayloadState.ATTACHED
 
         markerQoS = QoSProfile(
             depth=10, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
@@ -34,14 +51,27 @@ class Payload(Node):
 
         self.get_logger().info('Payload publisher node started.')
 
+        # service to attach/detach payload
+        self.attach_srv = self.create_service(
+            Empty,
+            'attach_payload',
+            self.attach_payload_callback,
+        )
+        self.detach_srv = self.create_service(
+            Empty,
+            'detach_payload',
+            self.detach_payload_callback,
+        )
+
     def timer_callback(self):
-        self.calc_payload_position()
-        if self.payload_pose is not None:
-            self.publish_payload_marker()
+        """Timer callback to update payload position."""
+        if self.payload_state == PayloadState.ATTACHED:
+            self.calc_payload_position()
+            if self.payload_pose is not None:
+                self.publish_payload_marker()
 
     def calc_payload_position(self):
-        # calculate payload position as intersection of spheres below each CF, 3 CFs
-
+        """Calculate payload position via trilateration."""
         self.get_tfs()
         valid = [tf for tf in self.tfs if tf is not None]
         if len(valid) < 3:
@@ -105,6 +135,7 @@ class Payload(Node):
         self.payload_pose.orientation.w = 1.0
 
     def get_tfs(self):
+        """Get transforms for all drones."""
         for (i, tf) in enumerate(self.tf_names):
             try:
                 self.tfs[i] = self.tf_buffer.lookup_transform(
@@ -115,6 +146,7 @@ class Payload(Node):
                 continue
 
     def publish_payload_marker(self):
+        """Publish payload marker and transform."""
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = 'world'
@@ -141,11 +173,29 @@ class Payload(Node):
         marker.pose = self.payload_pose
         self.payload_pub_.publish(marker)
 
+    def attach_payload_callback(self, request, response):
+        """Attach payload service callback."""
+        if self.payload_state == PayloadState.ATTACHED:
+            self.get_logger().info("Payload already attached.")
+        else:
+            self.payload_state = PayloadState.ATTACHED
+            self.get_logger().info("Payload attached.")
+        return response
+
+    def detach_payload_callback(self, request, response):
+        """Detach payload service callback."""
+        if self.payload_state == PayloadState.DETACHED:
+            self.get_logger().info("Payload already detached.")
+        else:
+            self.payload_state = PayloadState.DETACHED
+            self.get_logger().info("Payload detached.")
+        return response
+
 
 def main(args=None):
     """Start node."""
     rclpy.init(args=args)
-    node = Payload()
+    node = PayloadSim()
     rclpy.spin(node)
     rclpy.shutdown()
 

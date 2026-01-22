@@ -1,28 +1,62 @@
+#!/usr/bin/env python
+
+from pathlib import Path
+
+from ament_index_python import get_package_share_directory
 from crazyflie_py import Crazyswarm
+from crazyflie_py.uav_trajectory import Trajectory
 import numpy as np
+
+TRIALS = 1
+TIMESCALE = 1.0
+
+BUFFER_TIME = 2.0
+
+TAKEOFF_TIME = 2.0
+INITIAL_HEIGHT = 1.0
+
+LANDING_TIME = 2.0
 
 
 def main():
-    Z = 1.0
-
+    """Run the Crazyflie swarm with predefined trajectories."""
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
     allcfs = swarm.allcfs
 
-    print('press button to takeoff...')
-    swarm.input.waitUntilButtonPressed()
+    traj_cfs = []
+    for i in range(len(allcfs.crazyflies)):
+        traj_cfs.append(Trajectory())
+        csv_path = Path(get_package_share_directory(
+            'crazyflo_planner')) / 'data' / f'traj_cf{i+1}.csv'
+        traj_cfs[i].loadcsv(csv_path)
 
-    allcfs.takeoff(targetHeight=Z, duration=1.0+Z)
-    timeHelper.sleep(1.5+Z)
-    for cf in allcfs.crazyflies:
-        pos = np.array(cf.initialPosition) + np.array([0, 0, Z])
-        cf.goTo(pos, 0, 1.0)
+    allcfs.setParam('usd.logging', 1)  # enable logging
 
-    print('press button to land...')
-    swarm.input.waitUntilButtonPressed()
+    for i in range(TRIALS):
+        for i, cf in enumerate(allcfs.crazyflies):
+            cf.uploadTrajectory(0, 0, traj_cfs[i])
 
-    allcfs.land(targetHeight=0.02, duration=1.0+Z)
-    timeHelper.sleep(1.0+Z)
+        status = allcfs.crazyflies[0].get_status()
+        print(f'pm state : {status["pm_state"]}, battery left : {status["battery"]}')
+
+        print('press button to takeoff...')
+        swarm.input.waitUntilButtonPressed()
+        allcfs.takeoff(targetHeight=INITIAL_HEIGHT, duration=TAKEOFF_TIME)
+        timeHelper.sleep(BUFFER_TIME)
+
+        print('press button to start trajectory...')
+        swarm.input.waitUntilButtonPressed()
+        allcfs.startTrajectory(0, timescale=TIMESCALE)
+        timeHelper.sleep(traj_cfs[0].duration * TIMESCALE + BUFFER_TIME)
+
+        print('press button to land...')
+        swarm.input.waitUntilButtonPressed()
+        allcfs.land(targetHeight=0.03, duration=LANDING_TIME)
+        timeHelper.sleep(BUFFER_TIME)
+
+    # disable logging
+    allcfs.setParam('usd.logging', 0)
 
 
 if __name__ == '__main__':

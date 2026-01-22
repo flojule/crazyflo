@@ -11,41 +11,43 @@ export PYTHON_EXECUTABLE="$(which python3)"
 
 
 ros2 launch crazyflo_planner launch.py
-ros2 service call /all/takeoff crazyflie_interfaces/srv/Takeoff "{group_mask: 0, height: 0.5, duration: {sec: 2, nanosec: 0}}"
-ros2 service call /cf_1/go_to crazyflie_interfaces/srv/GoTo "goal: {x: 1.0, y: 1.0, z: 2.0}"
+ros2 service call /all/takeoff crazyflie_interfaces/srv/Takeoff "{group_mask: 0, height: 1.0, duration: {sec: 2, nanosec: 0}}"
 ros2 service call /all/go_to crazyflie_interfaces/srv/GoTo "{goal: {x: 1.0, y: 1.0, z: 2.0}, relative: 1}"
 ros2 service call /all/land crazyflie_interfaces/srv/Land "{group_mask: 0, height: 0.0, duration: {sec: 2, nanosec: 0}}"
+
+ros2 service call /cf_1/go_to crazyflie_interfaces/srv/GoTo "goal: {x: 1.0, y: 1.0, z: 2.0}"
 
 ros2 run crazyflo_planner figure8
 ros2 run crazyflie_examples figure8
 
 ros2 service call /all/emergency std_srvs/srv/Empty
 
-/all/arm
-/all/emergency
-/all/go_to
-/all/land
-/all/start_trajectory
-/all/takeoff
-
 srv/
-crazyflie_interfaces/srv/AddLogging           crazyflie_interfaces/srv/NotifySetpointsStop  crazyflie_interfaces/srv/Stop
-crazyflie_interfaces/srv/Arm                  crazyflie_interfaces/srv/RemoveLogging        crazyflie_interfaces/srv/Takeoff
-crazyflie_interfaces/srv/GoTo                 crazyflie_interfaces/srv/SetGroupMask         crazyflie_interfaces/srv/UpdateParams
-crazyflie_interfaces/srv/Land                 crazyflie_interfaces/srv/StartTrajectory      crazyflie_interfaces/srv/UploadTrajectory
+crazyflie_interfaces/srv/AddLogging
+crazyflie_interfaces/srv/NotifySetpointsStop
+crazyflie_interfaces/srv/Stop
+crazyflie_interfaces/srv/Arm                  
+crazyflie_interfaces/srv/RemoveLogging        
+crazyflie_interfaces/srv/Takeoff
+crazyflie_interfaces/srv/GoTo                 
+crazyflie_interfaces/srv/SetGroupMask         
+crazyflie_interfaces/srv/UpdateParams
+crazyflie_interfaces/srv/Land                 
+crazyflie_interfaces/srv/StartTrajectory      
+crazyflie_interfaces/srv/UploadTrajectory
 
 msg/
-crazyflie_interfaces/msg/ConnectionStatistics       crazyflie_interfaces/msg/LogBlock                   crazyflie_interfaces/msg/TrajectoryPolynomialPiece
-crazyflie_interfaces/msg/ConnectionStatisticsArray  crazyflie_interfaces/msg/LogDataGeneric             crazyflie_interfaces/msg/VelocityWorld
-crazyflie_interfaces/msg/FullState                  crazyflie_interfaces/msg/Position                   
-crazyflie_interfaces/msg/Hover                      crazyflie_interfaces/msg/Status    
+crazyflie_interfaces/msg/ConnectionStatistics       
+crazyflie_interfaces/msg/LogBlock                   
+crazyflie_interfaces/msg/TrajectoryPolynomialPiece
+crazyflie_interfaces/msg/ConnectionStatisticsArray  
+crazyflie_interfaces/msg/LogDataGeneric             
+crazyflie_interfaces/msg/VelocityWorld
+crazyflie_interfaces/msg/FullState                  
+crazyflie_interfaces/msg/Position                   
+crazyflie_interfaces/msg/Hover                      
+crazyflie_interfaces/msg/Status    
 
-
-crazyswarm2:
-
-ros2 launch crazyflie launch.py rviz:='True' backend:='sim' mocap:='False'
-ros2 run crazyflie_examples hello_world
-ros2 run crazyflie_examples figure8
 
 gui.py
 #!/usr/bin/env python3
@@ -58,5 +60,6 @@ ros-gz-crazyflie:
 ros2 launch ros_gz_crazyflie_bringup crazyflie_simulation.launch.py
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 
-
-cfclient
+or:
+gz sim -r worlds/crazyflie_world.sdf
+/crazyflie/gazebo/command/twist

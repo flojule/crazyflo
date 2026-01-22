@@ -15,5 +15,5 @@
     <!-- <node pkg="crazyflo_planner" exec="mission" name="mission" output="screen"/> -->
 
     <!-- payload -->
-    <node pkg="crazyflo_planner" exec="payload" name="payload" output="screen"/>
+    <node pkg="crazyflo_planner" exec="payload_sim" name="payload" output="screen"/>
 </launch>

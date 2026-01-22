@@ -16,12 +16,14 @@ setup(
             'launch/real.launch.py',
         ]),
         ('share/' + package_name + '/config', [
+            'config/config.rviz',
             'config/crazyflies.yaml',
             'config/motion_capture.yaml',
-            'config/config.rviz',
+            'config/planner_params.yaml',
         ]),
         ('share/' + package_name + '/data', [
             'data/figure8.csv',
+            'data/traj_cf1.csv',
         ]),
         # ('share/' + package_name + '/data/multi_trajectory', [
         #     'data/multi_trajectory/traj_1.csv',
@@ -41,8 +43,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'payload_sim = crazyflo_planner.payload_sim:main',
             'mission = crazyflo_planner.mission:main',
-            'payload = crazyflo_planner.payload:main',
+            'planner = crazyflo_planner.planner:main',
         ],
         
     },
