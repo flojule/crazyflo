@@ -24,6 +24,8 @@ setup(
         ('share/' + package_name + '/data', [
             'data/figure8.csv',
             'data/traj_cf1.csv',
+            'data/traj_cf2.csv',
+            'data/traj_cf3.csv',
         ]),
         # ('share/' + package_name + '/data/multi_trajectory', [
         #     'data/multi_trajectory/traj_1.csv',
@@ -46,6 +48,7 @@ setup(
             'payload_sim = crazyflo_planner.payload_sim:main',
             'mission = crazyflo_planner.mission:main',
             'planner = crazyflo_planner.planner:main',
+            'figure8 = crazyflo_planner.figure8:main',
         ],
         
     },

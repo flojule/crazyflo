@@ -17,19 +17,30 @@ INITIAL_HEIGHT = 1.0
 
 LANDING_TIME = 2.0
 
+csv_cf1 = Path(get_package_share_directory(
+    'crazyflo_planner')) / 'data' / f'traj_cf1.csv'
+csv_cf2 = Path(get_package_share_directory(
+    'crazyflo_planner')) / 'data' / f'traj_cf2.csv'
+csv_cf3 = Path(get_package_share_directory(
+    'crazyflo_planner')) / 'data' / f'traj_cf3.csv'
 
-def main():
+csv_path_default = [csv_cf1, csv_cf2, csv_cf3]
+# csv_path_default = [csv_cf1]
+
+
+def main(csv_paths=csv_path_default):
     """Run the Crazyflie swarm with predefined trajectories."""
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
     allcfs = swarm.allcfs
 
+    while len(csv_paths) < len(allcfs.crazyflies):
+        csv_paths.append(csv_paths[-1])
+
     traj_cfs = []
     for i in range(len(allcfs.crazyflies)):
         traj_cfs.append(Trajectory())
-        csv_path = Path(get_package_share_directory(
-            'crazyflo_planner')) / 'data' / f'traj_cf{i+1}.csv'
-        traj_cfs[i].loadcsv(csv_path)
+        traj_cfs[i].loadcsv(csv_paths[i])
 
     allcfs.setParam('usd.logging', 1)  # enable logging
 
@@ -37,8 +48,8 @@ def main():
         for i, cf in enumerate(allcfs.crazyflies):
             cf.uploadTrajectory(0, 0, traj_cfs[i])
 
-        status = allcfs.crazyflies[0].get_status()
-        print(f'pm state : {status["pm_state"]}, battery left : {status["battery"]}')
+        # status = allcfs.crazyflies[0].get_status()
+        # print(f'pm state : {status["pm_state"]}, battery left : {status["battery"]}')
 
         print('press button to takeoff...')
         swarm.input.waitUntilButtonPressed()
