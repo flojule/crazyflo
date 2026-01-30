@@ -4,7 +4,7 @@
     <!-- crazyflie -->
     <include file="$(find-pkg-share crazyflo_planner)/launch/launch.py" >
         <arg name="backend" value="cpp"/>
-        <arg name="crazyflies_yaml_file" value="$(find-pkg-share crazyflo_planner)/config/cf_real.yaml"/>
+        <arg name="crazyflies_yaml_file" value="$(find-pkg-share crazyflo_planner)/config/real.yaml"/>
     </include>
 
     <!-- rviz -->

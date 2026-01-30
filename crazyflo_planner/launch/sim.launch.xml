@@ -4,7 +4,7 @@
     <!-- crazyflie -->
     <include file="$(find-pkg-share crazyflo_planner)/launch/launch.py" >
         <arg name="backend" value="sim"/>
-        <arg name="crazyflies_yaml_file" value="$(find-pkg-share crazyflo_planner)/config/cf_sim.yaml"/>
+        <arg name="crazyflies_yaml_file" value="$(find-pkg-share crazyflo_planner)/config/sim.yaml"/>
     </include>
 
     <!-- payload -->

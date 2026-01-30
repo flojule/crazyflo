@@ -12,14 +12,16 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
             'launch/real.launch.xml',
+            'launch/real1.launch.xml',
             'launch/sim.launch.xml',
             'launch/launch.py',
-            'launch/cf1_real.launch.xml',
         ]),
         ('share/' + package_name + '/config', [
             'config/config.rviz',
-            'config/cf_real.yaml',
-            'config/cf_sim.yaml',
+            'config/config1.rviz',
+            'config/real.yaml',
+            'config/real1.yaml',
+            'config/sim.yaml',
             'config/crazyflo.yaml',
         ]),
         ('share/' + package_name + '/data', [
