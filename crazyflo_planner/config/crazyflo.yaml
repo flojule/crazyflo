@@ -1,0 +1,19 @@
+/**:
+  ros__parameters:
+
+    payload_start: [0.0, 0.0, 1.0]
+    payload_goal:  [2.0, 0.0, 1.0]
+
+    cf_1_start: [0.5, 0.0, 0.0]
+    cf_2_start: [-0.25, 0.433, 0.0]
+    cf_3_start: [-0.25, -0.433, 0.0]
+
+    max_velocity: 1.0
+    max_acceleration: 1.0
+    max_jerk: 2.0
+    max_snap: 5.0
+
+    cable_length: 1.0
+    # attach_offsets: [0.15, 0.0, 0.0,
+    #                  -0.075, 0.1299, 0.0,
+    #                  -0.075, -0.1299, 0.0]

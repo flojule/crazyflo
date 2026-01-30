@@ -1,70 +1,29 @@
 # named list of all robots
-fileversion: 3
-
 robots:
-  cf231:
+  cf1:
     enabled: true
-    uri: radio://0/80/2M/E7E7E7E7E7
+    uri: radio://0/80/2M/E7E7E7E7E1
     initial_position: [0.0, 0.0, 0.0]
-    type: cf21  # see robot_types
+    type: cf  # see robot_types
     # firmware_params:
     #   kalman:
     #     pNAcc_xy: 1.0 # default 0.5
-    # firmware_logging:
-    #   enabled: true
-    #   custom_topics:
-    #     topic_name3: 
-    #       frequency: 1
-    #       vars: ["acc.x", "acc.y"]
-    # reference_frame: "odom_cf231" # use a custom reference frame if no global coordinate system is available
 
-  cf5:
-    enabled: false
-    uri: radio://0/80/2M/E7E7E7E705
-    initial_position: [0.0, -0.5, 0.0]
-    type: cf21  # see robot_types
-    # firmware_params:
-    #   kalman:
-    #     pNAcc_xy: 1.0 # default 0.5
-    #firmware_logging:
-    #  custom_topics:
-    #    topic_name3: 
-    #      frequency: 1
-    #      vars: ["acc.x", "acc.y", "acc.z"]
-    # reference_frame: "odom_cf5" 
 
 # Definition of the various robot types
 robot_types:
-  cf21:
+  cf_sim:
     motion_capture:
-      tracking: "librigidbodytracker" # one of "vendor", "librigidbodytracker"
-      # only if enabled; see motion_capture.yaml
-      marker: default_single_marker
-      dynamics: default
+      enabled: false
     big_quad: false
-    battery:
-      voltage_warning: 3.8  # V
-      voltage_critical: 3.7 # V
-    # firmware_params:
-    #   kalman:
-    #     pNAcc_xy: 1.0 # default 0.5
-    #firmware_logging:
-    #   enabled: true
-    #   default_topics:
-    #   pose:
-    #     frequency: 1 # Hz
-    #   custom_topics:
-    #    topic_name3: 
-    #      frequency: 1
-    #      vars: ["acc.x", "acc.y", "acc.z"]
-    # reference_frame: "odom" 
+    # battery:
+    #   voltage_warning: 3.8  # V
+    #   voltage_critical: 3.7 # V
+    # firmware_logging:
 
-  cf21_mocap_deck:
+  cf:
     motion_capture:
-      tracking: "librigidbodytracker" # one of "vendor", "librigidbodytracker"
-      # only if enabled; see motion_capture.yaml
-      marker: mocap_deck
-      dynamics: default
+      enabled: false
     big_quad: false
     battery:
       voltage_warning: 3.8  # V
@@ -72,16 +31,24 @@ robot_types:
     # firmware_params:
     #   kalman:
     #     pNAcc_xy: 1.0 # default 0.5
-    #firmware_logging:
-    #   enabled: true
-    #   default_topics:
-    #   pose:
-    #     frequency: 1 # Hz
-    #   custom_topics:
-    #    topic_name3: 
-    #      frequency: 1
-    #      vars: ["acc.x", "acc.y", "acc.z"]
-    # reference_frame: "mocap" 
+    firmware_logging:
+      enabled: true
+      default_topics:
+        pose:
+          frequency: 100
+      custom_topics:
+        velocity:
+          frequency: 100
+          vars: ["kalman.statePX", "kalman.statePY", "kalman.statePZ"]
+        stabilizer:
+          frequency: 1 # Hz
+          vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw"]
+        acceleration: 
+          frequency: 1
+          vars: ["acc.x", "acc.y", "acc.z"]
+        thrust:
+          frequency: 50
+          vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4"]
 
 # global settings for all robots
 all:
@@ -93,15 +60,9 @@ all:
      # remove to disable default topic
       pose:
         frequency: 10 # Hz
-      status:
-        frequency: 1 # Hz
-    #custom_topics:
-    #  topic_name1:
-    #    frequency: 10 # Hz
-    #    vars: ["stateEstimateZ.x", "stateEstimateZ.y", "stateEstimateZ.z", "pm.vbat"]
-    #  topic_name2:
-    #    frequency: 1 # Hz
-    #    vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw"]
+      odom:
+        frequency: 100 # Hz
+    # custom_topics:
   # firmware parameters for all drones (use robot_types/type_name to set per type, or
   # robots/drone_name to set per drone)
   firmware_params:
@@ -109,21 +70,12 @@ all:
       enHighLevel: 1
     stabilizer:
       estimator: 2 # 1: complementary, 2: kalman
-      controller: 2 # 1: PID, 2: mellinger
-    # ring:
-    #   effect: 16 # 6: double spinner, 7: solid color, 16: packetRate
-    #   solidBlue: 255 # if set to solid color
-    #   solidGreen: 0 # if set to solid color
-    #   solidRed: 0 # if set to solid color
-    #   headlightEnable: 0
+      controller: 1 # 1: PID, 2: mellinger
     locSrv:
       extPosStdDev: 1e-3
       extQuatStdDev: 0.5e-1
     # kalman:
     #   resetEstimation: 1
-  # reference frame for on-board state-estimate of all drones (use robot_types/type_name to set per type, or
-  # robots/drone_name to set per drone)
-  reference_frame: "world"
   broadcasts:
     num_repeats: 15 # number of times broadcast commands are repeated
     delay_between_repeats_ms: 1 # delay in milliseconds between individual repeats

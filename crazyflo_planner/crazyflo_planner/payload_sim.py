@@ -26,9 +26,9 @@ class PayloadSim(Node):
         self.get_logger().info('Starting payload simulation node...')
 
         self.declare_parameter('rate_hz', 200.0)
-        rate_hz = self.get_parameter(
+        self.rate_hz = self.get_parameter(
             'rate_hz').get_parameter_value().double_value
-        self.timer = self.create_timer(1.0 / rate_hz, self.timer_callback)
+        self.timer = self.create_timer(1.0 / self.rate_hz, self.timer_callback)
 
         self.declare_parameter('cable_length', 1.0)
         self.cable_length = self.get_parameter(
@@ -42,7 +42,7 @@ class PayloadSim(Node):
         self.payload_pub_ = self.create_publisher(
             Marker, 'payload_marker', markerQoS)
 
-        self.tf_names = ["cf_1", "cf_2", "cf_3"]
+        self.tf_names = ["cf1", "cf2", "cf3"]
         self.tfs = [None] * len(self.tf_names)
 
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -63,11 +63,21 @@ class PayloadSim(Node):
             self.detach_payload_callback,
         )
 
+        # initial payload position
+        self.payload_pose = Pose()
+        self.payload_pose.position.x = 0.0
+        self.payload_pose.position.y = 0.0
+        self.payload_pose.position.z = 0.0
+        self.payload_pose.orientation.w = 1.0
+
+        self.time = 0.0
+
     def timer_callback(self):
         """Timer callback to update payload position."""
-        if self.payload_state == PayloadState.ATTACHED:
-            self.calc_payload_position()
-            if self.payload_pose is not None:
+        self.time += 1.0 / self.rate_hz
+        if self.time > 1.0:
+            if self.payload_state == PayloadState.ATTACHED:
+                self.calc_payload_position()
                 self.publish_payload_marker()
 
     def calc_payload_position(self):
@@ -76,7 +86,6 @@ class PayloadSim(Node):
         valid = [tf for tf in self.tfs if tf is not None]
         if len(valid) < 3:
             self.get_logger().warn("Need at least 3 valid drone transforms.")
-            self.payload_pose = None
             return
 
         # Drone positions in world frame
@@ -92,7 +101,6 @@ class PayloadSim(Node):
         d = np.linalg.norm(ex)
         if d < 1e-6:
             self.get_logger().warn("P1 and P2 too close for trilateration.")
-            self.payload_pose = None
             return
         ex = ex / d
 
@@ -101,7 +109,6 @@ class PayloadSim(Node):
         temp_norm = np.linalg.norm(temp)
         if temp_norm < 1e-6:
             self.get_logger().warn("Points nearly collinear; trilateration unstable.")
-            self.payload_pose = None
             return
         ey = temp / temp_norm
         ez = np.cross(ex, ey)
@@ -115,7 +122,6 @@ class PayloadSim(Node):
         z2 = L*L - x*x - y*y
         if z2 < 0.0:
             self.get_logger().warn("No real intersection (z^2 < 0).")
-            self.payload_pose = None
             return
         z = np.sqrt(z2)
 
@@ -125,14 +131,19 @@ class PayloadSim(Node):
         # choose lower z (payload hangs below)
         payload = sol1 if sol1[2] < sol2[2] else sol2
 
-        if payload[2] < 0.0:
-            payload[2] = 0.0  # payload cannot go below ground
+        payload_pose = Pose()
+        if payload[2] < 0.0:  # ground contact, no position update
+            payload_pose.position.x = self.payload_pose.position.x
+            payload_pose.position.y = self.payload_pose.position.y
+            payload_pose.position.z = 0.0
+        else:
+            payload_pose.position.x = float(payload[0])
+            payload_pose.position.y = float(payload[1])
+            payload_pose.position.z = float(payload[2])
+        payload_pose.orientation.w = 1.0
 
-        self.payload_pose = Pose()
-        self.payload_pose.position.x = float(payload[0])
-        self.payload_pose.position.y = float(payload[1])
-        self.payload_pose.position.z = float(payload[2])
-        self.payload_pose.orientation.w = 1.0
+        self.payload_pose = payload_pose
+
 
     def get_tfs(self):
         """Get transforms for all drones."""
@@ -190,6 +201,10 @@ class PayloadSim(Node):
             self.payload_state = PayloadState.DETACHED
             self.get_logger().info("Payload detached.")
         return response
+    
+    def get_payload_pose(self):
+        """Get current payload pose."""
+        return self.payload_pose
 
 
 def main(args=None):

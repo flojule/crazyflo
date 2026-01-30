@@ -2,15 +2,12 @@
 robots:
   cf1:
     enabled: true
-    uri: radio://0/78/2M/E7E7E7E7E6
-    # uri: udp://0.0.0.0:19850
-    # uri: usb://0
+    uri: radio://0/80/2M/E7E7E7E7E1
     initial_position: [0.0, 0.0, 0.0]
     type: cf  # see robot_types
     # firmware_params:
     #   kalman:
     #     pNAcc_xy: 1.0 # default 0.5
-
 
 # Definition of the various robot types
 robot_types:
@@ -18,11 +15,8 @@ robot_types:
     motion_capture:
       enabled: false
     big_quad: false
-    # battery:
-    #   voltage_warning: 3.8  # V
-    #   voltage_critical: 3.7 # V
-    # firmware_logging:
-
+    firmware_logging:
+      enabled: true
   cf:
     motion_capture:
       enabled: false
@@ -35,44 +29,71 @@ robot_types:
     #     pNAcc_xy: 1.0 # default 0.5
     firmware_logging:
       enabled: true
-      default_topics:
-        pose:
-          frequency: 100
       custom_topics:
-        velocity:
-          frequency: 100
+        poseKalman:
+          frequency: 10
           vars: ["kalman.statePX", "kalman.statePY", "kalman.statePZ"]
-        stabilizer:
-          frequency: 1 # Hz
-          vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw"]
         acceleration: 
-          frequency: 1
+          frequency: 10
           vars: ["acc.x", "acc.y", "acc.z"]
         thrust:
           frequency: 50
           vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4"]
+        stabilizer:
+          frequency: 10 # Hz
+          vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw"]
+
+  cf_mocap_deck:
+    motion_capture:
+      enabled: false
+      # only if enabled; see motion_capture.yaml
+      marker: mocap_deck
+      dynamics: default
+    big_quad: false
+    battery:
+      voltage_warning: 3.8  # V
+      voltage_critical: 3.7 # V
+
+    # firmware_params:
+    #   kalman:
+    #     pNAcc_xy: 1.0 # default 0.5
 
 # global settings for all robots
 all:
-  # firmware logging for all drones (use robot_types/type_name to set per type, or
-  # robots/drone_name to set per drone)
   firmware_logging:
     enabled: true
     default_topics:
-     # remove to disable default topic
       pose:
-        frequency: 10 # Hz
+        frequency: 100 # Hz
       odom:
         frequency: 100 # Hz
-    # custom_topics:
-  # firmware parameters for all drones (use robot_types/type_name to set per type, or
-  # robots/drone_name to set per drone)
   firmware_params:
     commander:
       enHighLevel: 1
     stabilizer:
       estimator: 2 # 1: complementary, 2: kalman
       controller: 1 # 1: PID, 2: mellinger
+    # pid_attitude:
+    #   roll_kp: 10
+    #   roll_ki: 0
+    #   roll_kd: 0
+    #   pitch_kp: 10
+    #   pitch_ki: 0
+    #   pitch_kd: 0
+    # pid_rate:
+    #   roll_kp: 500
+    #   roll_ki: 500
+    #   roll_kd: 3.6
+    #   pitch_kp: 500
+    #   pitch_ki: 500
+    #   pitch_kd: 3.6
+    #   rateFiltEn: 1
+    # ring:
+    #   effect: 16 # 6: double spinner, 7: solid color, 16: packetRate
+    #   solidBlue: 255 # if set to solid color
+    #   solidGreen: 0 # if set to solid color
+    #   solidRed: 0 # if set to solid color
+    #   headlightEnable: 0
     locSrv:
       extPosStdDev: 1e-3
       extQuatStdDev: 0.5e-1

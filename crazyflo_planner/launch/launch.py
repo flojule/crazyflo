@@ -20,7 +20,7 @@ def parse_yaml(context):
 
     # server params
     server_yaml = os.path.join(
-        get_package_share_directory('crazyflo_planner'),
+        get_package_share_directory('crazyflie'),
         'config',
         'server.yaml')
 
@@ -30,7 +30,7 @@ def parse_yaml(context):
     server_params = [crazyflies] + [server_yaml_content['/crazyflie_server']['ros__parameters']]
     # robot description
     urdf = os.path.join(
-        get_package_share_directory('crazyflo_planner'),
+        get_package_share_directory('crazyflie'),
         'urdf',
         'crazyflie_description.urdf')
     
@@ -38,54 +38,57 @@ def parse_yaml(context):
         robot_desc = f.read()
 
     server_params[1]['robot_description'] = robot_desc
-    
+
     return [
         Node(
             package='crazyflie',
             executable='crazyflie_server.py',
-            condition=LaunchConfigurationEquals('backend','cflib'),
+            condition=LaunchConfigurationEquals('backend', 'cflib'),
             name='crazyflie_server',
             output='screen',
-            parameters= server_params,
+            parameters=server_params,
         ),
         Node(
             package='crazyflie',
             executable='crazyflie_server',
-            condition=LaunchConfigurationEquals('backend','cpp'),
+            condition=LaunchConfigurationEquals('backend', 'cpp'),
             name='crazyflie_server',
             output='screen',
-            parameters= server_params,
+            parameters=server_params,
             prefix=PythonExpression(['"xterm -e gdb -ex run --args" if ', LaunchConfiguration('debug'), ' else ""']),
         ),
         Node(
             package='crazyflie_sim',
             executable='crazyflie_server',
-            condition=LaunchConfigurationEquals('backend','sim'),
+            condition=LaunchConfigurationEquals('backend', 'sim'),
             name='crazyflie_server',
             output='screen',
             emulate_tty=True,
-            parameters= server_params,
+            parameters=server_params,
         )]
+
 
 def generate_launch_description():
     default_crazyflies_yaml_path = os.path.join(
         get_package_share_directory('crazyflo_planner'),
         'config',
-        'crazyflie.yaml')
+        'cf_real.yaml')
 
     default_rviz_config_path = os.path.join(
         get_package_share_directory('crazyflo_planner'),
         'config',
-        'one.rviz')
+        'config.rviz')
 
     return LaunchDescription([
-        DeclareLaunchArgument('crazyflies_yaml_file', 
+        DeclareLaunchArgument('crazyflies_yaml_file',
                               default_value=default_crazyflies_yaml_path),
-        DeclareLaunchArgument('rviz_config_file', 
+        DeclareLaunchArgument('rviz_config_file',
                               default_value=default_rviz_config_path),
         DeclareLaunchArgument('backend', default_value='cpp'),
         DeclareLaunchArgument('debug', default_value='False'),
-        DeclareLaunchArgument('rviz', default_value='True'),
+        DeclareLaunchArgument('rviz', default_value='False'),
+        DeclareLaunchArgument('gui', default_value='False'),
+        DeclareLaunchArgument('mocap', default_value='False'),
         OpaqueFunction(function=parse_yaml),
         Node(
             condition=LaunchConfigurationEquals('rviz', 'True'),

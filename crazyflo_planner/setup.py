@@ -11,19 +11,16 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', [
-            'launch/launch_real.xml',
-            'launch/launch_sim.xml',
-            'launch/launch_one.py',
+            'launch/real.launch.xml',
+            'launch/sim.launch.xml',
+            'launch/launch.py',
+            'launch/cf1_real.launch.xml',
         ]),
         ('share/' + package_name + '/config', [
             'config/config.rviz',
-            'config/one.rviz',
-            'config/crazyflie.yaml',
-            'config/crazyflies.yaml',
-            'config/motion_capture.yaml',
-            'config/planner_params.yaml',
-            'config/server.yaml',
-            'config/teleop.yaml',
+            'config/cf_real.yaml',
+            'config/cf_sim.yaml',
+            'config/crazyflo.yaml',
         ]),
         ('share/' + package_name + '/data', [
             'data/figure8.csv',
@@ -53,7 +50,6 @@ setup(
         'console_scripts': [
             'payload_sim = crazyflo_planner.payload_sim:main',
             'mission = crazyflo_planner.mission:main',
-            'planner = crazyflo_planner.planner:main',
             'figure8 = crazyflo_planner.figure8:main',
         ],
         

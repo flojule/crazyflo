@@ -52,11 +52,11 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        cf_1:
+        cf1:
           Value: true
-        cf_2:
+        cf2:
           Value: true
-        cf_3:
+        cf3:
           Value: true
         payload:
           Value: true
@@ -69,11 +69,11 @@ Visualization Manager:
       Show Names: true
       Tree:
         world:
-          cf_1:
+          cf1:
             {}
-          cf_2:
+          cf2:
             {}
-          cf_3:
+          cf3:
             {}
           payload:
             {}
@@ -89,7 +89,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cf_1/robot_description
+        Value: /cf1/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -97,7 +97,7 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        cf_1:
+        cf1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -120,7 +120,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cf_2/robot_description
+        Value: /cf2/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -128,7 +128,7 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        cf_2:
+        cf2:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -151,7 +151,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cf_3/robot_description
+        Value: /cf3/robot_description
       Enabled: true
       Links:
         All Links Enabled: true
@@ -159,7 +159,7 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        cf_3:
+        cf3:
           Alpha: 1
           Show Axes: false
           Show Trail: false

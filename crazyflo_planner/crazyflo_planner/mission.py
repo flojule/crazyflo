@@ -5,6 +5,8 @@ from pathlib import Path
 from ament_index_python import get_package_share_directory
 from crazyflie_py import Crazyswarm
 from crazyflie_py.uav_trajectory import Trajectory
+from cflib.crtp import scan_interfaces
+
 import numpy as np
 
 TRIALS = 1
@@ -33,6 +35,8 @@ def main(csv_paths=csv_path_default):
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
     allcfs = swarm.allcfs
+    
+    # print(scan_interfaces())
 
     while len(csv_paths) < len(allcfs.crazyflies):
         csv_paths.append(csv_paths[-1])
@@ -47,9 +51,6 @@ def main(csv_paths=csv_path_default):
     for i in range(TRIALS):
         for i, cf in enumerate(allcfs.crazyflies):
             cf.uploadTrajectory(0, 0, traj_cfs[i])
-
-        # status = allcfs.crazyflies[0].get_status()
-        # print(f'pm state : {status["pm_state"]}, battery left : {status["battery"]}')
 
         print('press button to takeoff...')
         swarm.input.waitUntilButtonPressed()

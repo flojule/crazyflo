@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+    <!-- crazyflie -->
+    <include file="$(find-pkg-share crazyflo_planner)/launch/launch.py" >
+        <arg name="backend" value="cpp"/>
+        <arg name="crazyflies_yaml_file" value="$(find-pkg-share crazyflo_planner)/config/cf_real.yaml"/>
+    </include>
+
+    <!-- rviz -->
+    <arg name="rviz_config" default="$(find-pkg-share crazyflo_planner)/config/config.rviz" description="RViz config file"/>
+
+    <node pkg="rviz2" exec="rviz2" name="rviz2" output="screen" on_exit="shutdown" args="-d $(var rviz_config)"/>
+</launch>
