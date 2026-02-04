@@ -186,7 +186,7 @@ def solve_ocp(
 
 def main():
     p_start = np.array([0.0, 0.0, 0.1])
-    p_goal = np.array([2.0, 0.0, 0.1])
+    p_goal = np.array([1.0, 0.0, 0.1])
 
     r0 = [
         np.array([0.5, 0.0, 1.0]),
