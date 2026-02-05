@@ -66,3 +66,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 or:
 gz sim -r worlds/crazyflie_world.sdf
 /crazyflie/gazebo/command/twist
+
+
+record
+ros2 bag record -o pose --topics /cf1/pose /cf2/pose /cf3/pose

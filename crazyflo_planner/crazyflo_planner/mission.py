@@ -7,7 +7,7 @@ from crazyflie_py import Crazyswarm
 from crazyflie_py.uav_trajectory import Trajectory
 from cflib.crtp import scan_interfaces
 
-import numpy as np
+from crazyflo_planner.cf_solver import get_traj
 
 TRIALS = 1
 TIMESCALE = 1.0
@@ -19,24 +19,21 @@ INITIAL_HEIGHT = 0.5
 
 LANDING_TIME = 2.0
 
-csv_cf1 = Path(get_package_share_directory(
-    'crazyflo_planner')) / 'data' / f'traj_cf1.csv'
-csv_cf2 = Path(get_package_share_directory(
-    'crazyflo_planner')) / 'data' / f'traj_cf2.csv'
-csv_cf3 = Path(get_package_share_directory(
-    'crazyflo_planner')) / 'data' / f'traj_cf3.csv'
-
-csv_path_default = [csv_cf1, csv_cf2, csv_cf3]
-# csv_path_default = [csv_cf1]
+data_path = Path.home() / ".ros/crazyflo_planner" / "data"
 
 
-def main(csv_paths=csv_path_default):
+def main():
     """Run the Crazyflie swarm with predefined trajectories."""
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
     allcfs = swarm.allcfs
-    
-    # print(scan_interfaces())
+
+    get_traj(ros=True)  # generate trajectories
+    csv_cf1 = data_path / 'traj_cf1.csv'
+    csv_cf2 = data_path / 'traj_cf2.csv'
+    csv_cf3 = data_path / 'traj_cf3.csv'
+
+    csv_paths = [csv_cf1, csv_cf2, csv_cf3]
 
     while len(csv_paths) < len(allcfs.crazyflies):
         csv_paths.append(csv_paths[-1])

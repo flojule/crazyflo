@@ -1,103 +1,105 @@
 #!/usr/bin/env python3
 """
-3-drone payload OCP (direct multiple shooting) with:
-  (1) RK4 integration (payload + drone velocities)
-  (2) optional payload reference trajectory input p_ref[k] or callable p_ref(t)
-  (3) piecewise 7th-order polynomial fitting + Crazyflie/uav_trajectory-style export
+3-drone payload OCP solver using CasADi.
 """
 
-from __future__ import annotations
 import numpy as np
-import casadi as ca
+from pathlib import Path
 
-import cf_plots
-from cf_poly7 import fit_poly7_piecewise, write_multi_csv
+import casadi as ca
 
 
 def solve_ocp(
-    p_start: np.ndarray,  # initial payload position
-    p_goal: np.ndarray,  # goal payload position
-    p_ref: None | np.ndarray = None,  # optional reference trajectory samples (N+1,3)
-    r0: list[np.ndarray] = [np.array([0.5, 0.0, 1.0]),
-                            np.array([-0.25, 0.433, 1.0]),
-                            np.array([-0.25, -0.433, 1.0])],  # initial drone positions
-    T: float = 4.0,  # total time
-    N: int = 80,  # number of control intervals
-    L: tuple[float, float, float] = (1.0, 1.0, 1.0),  # cable lengths
-    mp: float = 0.05,  # payload mass in kg
+    pl_p_ref: np.ndarray,  # payload reference trajectory ( N+1, 3 )
+    cf_p0: list[np.ndarray],  # initial drone positions
+    t_grid: np.ndarray,  # time grid samples (N+1,)
+    L: float,  # cable length
+    pl_mass: float = 0.03,  # payload mass in kg
     g: float = 9.81,  # gravity acceleration
-    v_max: float = 1.0,  # norm of velocity limits
+    v_max: float = 2.0,  # norm of velocity limits
     a_max: float = 5.0,  # norm of acceleration limits
-    uz_min: float = -5.0,  # vertical acceleration limits
-    uz_max: float = 5.0,  # vertical acceleration limits
-    lam_min: float = 0.1,  # min tension in N
-    lam_max: float = 1.0,  # max tension in N
-    w_track: float = 10.0,  # tracking weight
-    w_u: float = 0.1,  # control effort weight
-    w_lam: float = 0.01,  # tension weight
-    w_terminal: float = 200.0,  # terminal position weight
-) -> dict[str, np.ndarray]:
+    j_max: float = 10.0,  # norm of jerk limits
+    thrust_min: float = -5.0,  # vertical acceleration limits
+    thrust_max: float = 5.0,  # vertical acceleration limits
+    tension_min: float = 0.05,  # min tension in N
+    tension_max: float = 0.5,  # max tension in N
+    # cf_pl_max: float = 0.015,  # crazyflie max payload in kg
+    cf_collision: float = 0.2,  # crazyflie distance drone-drone in m
+    w_p: float = 10.0,  # tracking weight
+    w_a: float = 0.001,  # acceleration weight
+    w_j: float = 0.001,  # jerk weight
+    w_tension: float = 10.0,  # tension weight
+    # w_goal: float = 10.0,  # terminal position weight
+) -> dict:
     """Solve the 3-drone payload OCP."""
-    p_start = np.asarray(p_start, dtype=float).reshape(3)
-    p_goal = np.asarray(p_goal, dtype=float).reshape(3)
+    dt = t_grid[1] - t_grid[0]
+    M = pl_p_ref.shape[0]  # number of reference points
 
-    dt = float(T) / int(N)
-    ez = np.array([0.0, 0.0, -1.0])
-
-    # Payload trajectory to track
-    t_grid = np.linspace(0.0, T, N + 1)
-    if p_ref is None:
-        p_d = np.stack([(1 - (k / N)) * p_start + (k / N) * p_goal for k in range(N + 1)], axis=0)
-    else:
-        p_d = np.asarray(p_ref, dtype=float).reshape(N + 1, 3)
-
-    # Casadi optimizer
     opti = ca.Opti()
 
-    # Decision variables
-    p = opti.variable(3, N + 1)  # payload positions
-    vp = opti.variable(3, N + 1)  # payload velocities
+    # ######### Decision variables #########
+    pl_p = opti.variable(3, M)  # payload positions
+    pl_v = opti.variable(3, M)  # payload velocities
 
-    v = [opti.variable(3, N + 1) for _ in range(3)]  # drone velocities
-    u = [opti.variable(3, N) for _ in range(3)]  # drone accelerations
-    s = [opti.variable(3, N + 1) for _ in range(3)]  # unit cable directions
-    lam = [opti.variable(1, N) for _ in range(3)]  # cable tensions
+    # cf_p = [opti.variable(3, M) for _ in range(3)]  # drone positions
+    cf_v = [opti.variable(3, M) for _ in range(3)]  # drone velocities
+    cf_a = [opti.variable(3, M - 1) for _ in range(3)]  # drone accelerations
+    # cf_j = [opti.variable(3, M - 2) for _ in range(3)]  # drone jerks
+    cf_cable_dir = [opti.variable(3, M) for _ in range(3)]  # unit cable directions
+    cf_cable_t = [opti.variable(1, M - 1) for _ in range(3)]  # cable tensions
 
-    def r_i(i: int, k: int):  # drone i position at time step k
-        return p[:, k] + L[i] * s[i][:, k]
+    def cf_p_it(i: int, k: int):  # drone i position at time step k
+        return pl_p[:, k] + L * cf_cable_dir[i][:, k]
 
-    # Boundary conditions payload positions/velocities
-    opti.subject_to(p[:, 0] == p_start)
-    opti.subject_to(p[:, N] == p_goal)
-    opti.subject_to(vp[:, 0] == ca.DM.zeros(3, 1))
-    opti.subject_to(vp[:, N] == ca.DM.zeros(3, 1))
+    # ######### Constraints #########
+    # Payload boundary conditions
+    opti.subject_to(pl_p[:, 0] == pl_p_ref[0])
+    opti.subject_to(pl_p[:, M - 1] == pl_p_ref[-1])
+    opti.subject_to(pl_v[:, 0] == ca.DM.zeros(3, 1))
+    opti.subject_to(pl_v[:, M - 1] == ca.DM.zeros(3, 1))
 
-    # Unit cable directions
+    # Drones boundary conditions
     for i in range(3):
-        for k in range(N + 1):
-            opti.subject_to(ca.sumsqr(s[i][:, k]) == 1.0)
+        opti.subject_to(cf_p_it(i, 0) == cf_p0[i])
+        opti.subject_to(cf_v[i][:, 0] == ca.DM.zeros(3, 1))
+        opti.subject_to(cf_v[i][:, M - 1] == ca.DM.zeros(3, 1))
+        opti.subject_to(cf_a[i][:, 0] == ca.DM.zeros(3, 1))
+        opti.subject_to(cf_a[i][:, M - 2] == ca.DM.zeros(3, 1))
+        # opti.subject_to(cf_j[i][:, 0] == ca.DM.zeros(3, 1))
+        # opti.subject_to(cf_j[i][:, M - 3] == ca.DM.zeros(3, 1))
 
-    # Tension bounds
+    # Drones speed/acceleration/jerk limits
     for i in range(3):
-        opti.subject_to(lam[i] >= lam_min)
-        opti.subject_to(lam[i] <= lam_max)
+        for k in range(M):
+            opti.subject_to(ca.sumsqr(cf_v[i][:, k]) <= v_max ** 2)
+        for k in range(M - 1):
+            opti.subject_to(ca.sumsqr(cf_a[i][:, k]) <= a_max ** 2)
+            opti.subject_to(cf_a[i][2, k] >= thrust_min)
+            opti.subject_to(cf_a[i][2, k] <= thrust_max)
+        # for k in range(M - 2):
+        #     opti.subject_to(ca.sumsqr(cf_j[i][:, k]) <= j_max ** 2)
 
-    # Speed/accel bounds (squared)
+    # Drones collision avoidance
+    for k in range(M):
+        d1 = cf_p_it(0, k) - cf_p_it(1, k)
+        d2 = cf_p_it(1, k) - cf_p_it(2, k)
+        d3 = cf_p_it(2, k) - cf_p_it(0, k)
+        opti.subject_to(ca.sumsqr(d1) >= cf_collision ** 2)
+        opti.subject_to(ca.sumsqr(d2) >= cf_collision ** 2)
+        opti.subject_to(ca.sumsqr(d3) >= cf_collision ** 2)
+
+    # Drones cable tension limits and unit directions
     for i in range(3):
-        for k in range(N + 1):
-            opti.subject_to(ca.sumsqr(v[i][:, k]) <= v_max ** 2)
-        for k in range(N):
-            opti.subject_to(ca.sumsqr(u[i][:, k]) <= a_max ** 2)
-            opti.subject_to(u[i][2, k] >= uz_min)
-            opti.subject_to(u[i][2, k] <= uz_max)
+        for k in range(M):
+            opti.subject_to(ca.sumsqr(cf_cable_dir[i][:, k]) == 1.0)
+        opti.subject_to(cf_cable_t[i] >= tension_min)
+        opti.subject_to(cf_cable_t[i] <= tension_max)
 
     # Dynamics
     def payload_f(x: ca.MX, sum_tension_vec: ca.MX) -> ca.MX:
-        # x = [p; vp]
-        p_ = x[0:3]
-        vp_ = x[3:6]
-        ap_ = (1.0 / mp) * sum_tension_vec + ca.DM(ez) * g
-        return ca.vertcat(vp_, ap_)
+        pl_v_ = x[3:6]
+        pl_a_ = (1.0 / pl_mass) * sum_tension_vec - ca.DM([0.0, 0.0, g])
+        return ca.vertcat(pl_v_, pl_a_)
 
     def rk4_step(xk: ca.MX, fk, dt_: float) -> ca.MX:
         k1 = fk(xk)
@@ -106,115 +108,162 @@ def solve_ocp(
         k4 = fk(xk + dt_ * k3)
         return xk + (dt_ / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
 
-    # Payload RK4 + drone velocity RK4 (trivial since dv=u constant)
-    for k in range(N):
+    # Payload RK4 + drone velocity RK4
+    for k in range(M - 1):
         sum_tension = ca.DM.zeros(3, 1)
         for i in range(3):
-            sum_tension += lam[i][:, k] * s[i][:, k]
+            sum_tension += cf_cable_t[i][:, k] * cf_cable_dir[i][:, k]
 
-        xk = ca.vertcat(p[:, k], vp[:, k])
+        xk = ca.vertcat(pl_p[:, k], pl_v[:, k])
 
-        # payload step with ZOH tension/s[k], lam[k]
+        # payload step
         x_next = rk4_step(
             xk,
             fk=lambda xx: payload_f(xx, sum_tension),
             dt_=dt
         )
-        opti.subject_to(p[:, k + 1] == x_next[0:3])
-        opti.subject_to(vp[:, k + 1] == x_next[3:6])
+        opti.subject_to(pl_p[:, k + 1] == x_next[0:3])
+        opti.subject_to(pl_v[:, k + 1] == x_next[3:6])
 
-        # drone velocity: v_{k+1} = v_k + dt*u_k (RK4 identical for constant u)
+        # drone velocity/position step
         for i in range(3):
-            opti.subject_to(v[i][:, k + 1] == v[i][:, k] + dt * u[i][:, k])
+            opti.subject_to(cf_v[i][:, k + 1] == cf_v[i][:, k] + dt * cf_a[i][:, k])
+            opti.subject_to((cf_p_it(i, k + 1) - cf_p_it(i, k)) == dt * cf_v[i][:, k])
 
-            opti.subject_to((r_i(i, k + 1) - r_i(i, k)) == dt * v[i][:, k])
-
-    # Cost
+    # ######### Cost function #########
     J = 0
-    for k in range(N + 1):
-        J += w_track * ca.sumsqr(p[:, k] - ca.DM(p_d[k]))
+    for k in range(M):
+        J += w_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[k]))
     for i in range(3):
-        for k in range(N):
-            J += w_u * ca.sumsqr(u[i][:, k])
-            J += w_lam * ca.sumsqr(lam[i][:, k])
-    J += w_terminal * ca.sumsqr(p[:, N] - ca.DM(p_goal))
+        for k in range(M - 1):
+            J += w_a * ca.sumsqr(cf_a[i][:, k])
+            J += w_tension * ca.sumsqr(cf_cable_t[i][:, k])
+        for k in range(M - 2):
+            cf_j = (ca.vertcat(
+                cf_a[i][:, k + 1] - cf_a[i][:, k]
+            )) / dt
+            J += w_j * ca.sumsqr(cf_j)
+            # J += w_j * ca.sumsqr(cf_j[i][:, k])
+    # J += w_goal * ca.sumsqr(pl_p[:, M - 1] - ca.DM(pl_p_ref[-1]))
     opti.minimize(J)
 
-    # Initial guess
-    p_guess = np.linspace(p_start, p_goal, N + 1).T
-    opti.set_initial(p, p_guess)
-    opti.set_initial(vp, 0.0)
+    # ######### Initial guess #########
+    opti.set_initial(pl_p, pl_p_ref.T)
+    opti.set_initial(pl_v, 0.0)
+    # for i in range(3):
+        # for k in range(M):
+        #     opti.set_initial(cf_v[i][:, k], 0.0)
+        # for k in range(M - 1):
+        #     opti.set_initial(cf_a[i][:, k], 0.0)
+        # for k in range(M - 2):
+        #     opti.set_initial(cf_j[i][:, k], 0.0)
 
     base_dirs = np.zeros((3, 3))
-
     for i in range(3):
-        d = r0[i] - p_start
-        norm = np.linalg.norm(d)
-        if norm < 1e-6:
-            raise ValueError(f"Drone {i} too close to payload.")
-        base_dirs[i] = d / norm
+        base_dirs[i] = (cf_p0[i] - pl_p_ref[0]) / L
+        opti.set_initial(cf_cable_dir[i], np.tile(base_dirs[i].reshape(3, 1), (1, M)))
+        opti.set_initial(cf_cable_t[i], 0.1)
 
-    for i in range(3):
-        opti.set_initial(s[i], np.tile(base_dirs[i].reshape(3, 1), (1, N + 1)))
-        opti.set_initial(v[i], 0.0)
-        opti.set_initial(u[i], 0.0)
-        opti.set_initial(lam[i], 0.2)
-
+    # ######### Solver #########
     p_opts = {"expand": True}
     opti.solver("ipopt", p_opts)
     sol = opti.solve()
 
     # Extract
-    p_sol = sol.value(p)
-    vp_sol = sol.value(vp)
-    v_sol = [sol.value(v[i]) for i in range(3)]
-    u_sol = [sol.value(u[i]) for i in range(3)]
-    s_sol = [sol.value(s[i]) for i in range(3)]
-    lam_sol = [sol.value(lam[i]) for i in range(3)]
-    r_sol = [p_sol + L[i] * s_sol[i] for i in range(3)]
+    pl_p_sol = sol.value(pl_p)
+    pl_v_sol = sol.value(pl_v)
+    cf_v_sol = [sol.value(cf_v[i]) for i in range(3)]
+    cf_a_sol = [sol.value(cf_a[i]) for i in range(3)]
+    cf_cable_dir_sol = [sol.value(cf_cable_dir[i]) for i in range(3)]
+    cf_cable_t_sol = [sol.value(cf_cable_t[i]) for i in range(3)]
+    cf_p_sol = [pl_p_sol + L * cf_cable_dir_sol[i] for i in range(3)]
 
     return {
         "t": t_grid,
-        "p": p_sol, "vp": vp_sol,
-        "r1": r_sol[0], "r2": r_sol[1], "r3": r_sol[2],
-        "v1": v_sol[0], "v2": v_sol[1], "v3": v_sol[2],
-        "u1": u_sol[0], "u2": u_sol[1], "u3": u_sol[2],
-        "lam1": lam_sol[0], "lam2": lam_sol[1], "lam3": lam_sol[2],
-        "s1": s_sol[0], "s2": s_sol[1], "s3": s_sol[2],
-        "p_ref": p_d,
+        "pl_p": pl_p_sol, "pl_v": pl_v_sol,
+        "cf1_p": cf_p_sol[0], "cf2_p": cf_p_sol[1], "cf3_p": cf_p_sol[2],
+        "cf1_v": cf_v_sol[0], "cf2_v": cf_v_sol[1], "cf3_v": cf_v_sol[2],
+        "cf1_a": cf_a_sol[0], "cf2_a": cf_a_sol[1], "cf3_a": cf_a_sol[2],
+        "cf1_t": cf_cable_t_sol[0], "cf2_t": cf_cable_t_sol[1], "cf3_t": cf_cable_t_sol[2],
+        "cf1_d": cf_cable_dir_sol[0], "cf2_d": cf_cable_dir_sol[1], "cf3_d": cf_cable_dir_sol[2],
+        "pl_p_ref": pl_p_ref,
+        "L": L,
+        "cf_collision": cf_collision,
     }
 
-def main():
-    p_start = np.array([0.0, 0.0, 0.1])
-    p_goal = np.array([1.0, 0.0, 0.1])
 
-    r0 = [
-        np.array([0.5, 0.0, 1.0]),
-        np.array([-0.25, 0.433, 1.0]),
-        np.array([-0.25, -0.433, 1.0]),
+def get_traj(traj='circle', plot=True, save_csv=True, ros=False):
+    """Solve an example OCP and export trajectories."""
+    cf_height = 1.0  # solve at 1m height
+    L = 0.5  # cable lengths
+    alpha = np.pi / 4.0  # rope angle
+    gamma = 2.0 * np.pi / 3.0  # drone separation angle
+    pl_height = cf_height - L * np.cos(alpha)
+
+    # time
+    T = 2.0  # total time
+    dt = 0.01  # 100 Hz
+    N = int(T / dt)
+    t_grid = np.linspace(0.0, T, N + 1)
+
+    if traj == 'circle':
+        # payload ref trajectory: ellipse
+        r_A = 0.5
+        r_B = 0.2
+        p_ref = np.stack([
+            r_A * (1.0 - np.cos(2 * np.pi * t_grid / T)),
+            r_B * np.sin(2 * np.pi * t_grid / T),
+            pl_height * np.ones(N + 1),
+        ], axis=1)
+        pl_p_start = p_ref[0]
+        pl_p_goal = p_ref[-1]
+    else:  # straight line
+        pl_p_start = np.array([0.0, 0.0, pl_height])
+        pl_p_goal = np.array([-0.5, 0.0, pl_height])
+        p_ref = np.stack([(1 - (k / N)) * pl_p_start + (k / N) * pl_p_goal for k in range(N + 1)], axis=0)
+
+    # drone initial positions
+    cf_R = L * np.cos(alpha)  # radius of drone circle
+    cf_p0 = [
+        np.array([cf_R * np.cos(0), cf_R * np.sin(0), cf_height]),
+        np.array([cf_R * np.cos(gamma), cf_R * np.sin(gamma), cf_height]),
+        np.array([cf_R * np.cos(2 * gamma), cf_R * np.sin(2 * gamma), cf_height]),
     ]
 
     sol = solve_ocp(
-        p_start=p_start,
-        p_goal=p_goal,
-        r0=r0,
+        pl_p_ref=p_ref,
+        t_grid=t_grid,
+        cf_p0=cf_p0,
+        L=L,
     )
+    print("Solved. Payload at:", sol["pl_p"][:, -1])
 
-    print("Solved. Payload at:", sol["p"][:, -1])
+    if ros:
+        from . import cf_plots
+        from .cf_poly7 import fit_poly7_piecewise, write_multi_csv
+    else:
+        import cf_plots
+        from cf_poly7 import fit_poly7_piecewise, write_multi_csv
 
-    t = sol["t"]
-    folder = "crazyflo_planner/data"
-    name = ["cf1", "cf2", "cf3"]
-    for i, r_i in enumerate(("r1", "r2", "r3")):
-        pos = sol[r_i]  # (3, N+1)
-        segs = fit_poly7_piecewise(t=t, pos=pos, yaw=None, segment_every=10)
-        out = f"{folder}/traj_{name[i]}.csv"
-        write_multi_csv(out, segs)
-        print(f"Wrote {out} with {len(segs)} segments")
+    if save_csv:
+        print("Saving trajectories...")
+        data_path = Path.home() / ".ros/crazyflo_planner" / "data"
+        data_path.mkdir(parents=True, exist_ok=True)
 
-    np.savez(f"{folder}/ocp_solution.npz", **{k: v for k, v in sol.items()})
-    cf_plots.plot_data(sol)
+        t_grid = sol["t"]
+        name = ["cf1", "cf2", "cf3"]
+        for i, r_i in enumerate(("cf1_p", "cf2_p", "cf3_p")):
+            pos = sol[r_i]  # (3, N+1)
+            segs = fit_poly7_piecewise(t=t_grid, pos=pos, yaw=None, segment_every=10)
+            out = data_path / f"traj_{name[i]}.csv"
+            write_multi_csv(out, segs)
+            print(f"Wrote {out} with {len(segs)} segments")
+
+        np.savez(data_path / "ocp_solution.npz", **{k: v for k, v in sol.items()})
+
+    if plot:
+        cf_plots.plot_data(sol)
 
 
 if __name__ == "__main__":
-    main()
+    get_traj(traj='circle', plot=True, save_csv=True, ros=False)

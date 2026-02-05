@@ -30,7 +30,7 @@ class PayloadSim(Node):
             'rate_hz').get_parameter_value().double_value
         self.timer = self.create_timer(1.0 / self.rate_hz, self.timer_callback)
 
-        self.declare_parameter('cable_length', 1.0)
+        self.declare_parameter('cable_length', 0.5)
         self.cable_length = self.get_parameter(
             'cable_length').get_parameter_value().double_value
 

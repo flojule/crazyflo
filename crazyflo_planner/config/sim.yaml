@@ -3,19 +3,19 @@ robots:
   cf1:
     enabled: true
     uri: udp://0.0.0.0:19850
-    initial_position: [0.5, 0.0, 0.0]
+    initial_position: [0.2, 0.0, 0.0]
     type: cf_sim  # see robot_types
 
   cf2:
     enabled: true
     uri: udp://0.0.0.0:19851
-    initial_position: [-0.25, 0.433, 0.0]
+    initial_position: [0.0, 0.2, 0.0]
     type: cf_sim  # see robot_types
 
   cf3:
     enabled: true
     uri: udp://0.0.0.0:19852
-    initial_position: [-0.25, -0.433, 0.0]
+    initial_position: [0.0, -0.2, 0.0]
     type: cf_sim  # see robot_types
 
 # Definition of the various robot types
