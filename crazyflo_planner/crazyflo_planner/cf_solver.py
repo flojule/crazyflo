@@ -19,15 +19,17 @@ def solve_ocp(
     v_max: float = 2.0,  # norm of velocity limits
     a_max: float = 5.0,  # norm of acceleration limits
     j_max: float = 10.0,  # norm of jerk limits
+    s_max: float = 1.0,  # norm of snap limits
     thrust_min: float = -5.0,  # vertical acceleration limits
     thrust_max: float = 5.0,  # vertical acceleration limits
     tension_min: float = 0.05,  # min tension in N
     tension_max: float = 0.5,  # max tension in N
     # cf_pl_max: float = 0.015,  # crazyflie max payload in kg
-    cf_radius: float = 0.1,  # crazyflie radius for drone-drone collision in m
-    w_p: float = 10.0,  # tracking weight
+    cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
+    w_p: float = 100.0,  # tracking weight
     w_a: float = 0.001,  # acceleration weight
     w_j: float = 0.001,  # jerk weight
+    w_s: float = 0.001,  # snap weight
     w_tension: float = 10.0,  # tension weight
     # w_goal: float = 10.0,  # terminal position weight
 ) -> dict:
@@ -45,6 +47,7 @@ def solve_ocp(
     cf_v = [opti.variable(3, M) for _ in range(3)]  # drone velocities
     cf_a = [opti.variable(3, M - 1) for _ in range(3)]  # drone accelerations
     # cf_j = [opti.variable(3, M - 2) for _ in range(3)]  # drone jerks
+    # cf_s = [opti.variable(3, M - 3) for _ in range(3)]  # drone snaps
     cf_cable_dir = [opti.variable(3, M) for _ in range(3)]  # unit cable directions
     cf_cable_t = [opti.variable(1, M - 1) for _ in range(3)]  # cable tensions
 
@@ -132,18 +135,29 @@ def solve_ocp(
 
     # ######### Cost function #########
     J = 0
-    for k in range(M):
+    for k in range(M):  # tracking error
         J += w_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[k]))
-    for i in range(3):
+    for i in range(3):  # cable tension
         for k in range(M - 1):
-            J += w_a * ca.sumsqr(cf_a[i][:, k])
             J += w_tension * ca.sumsqr(cf_cable_t[i][:, k])
-        for k in range(M - 2):
+    for i in range(3):  # drone/payload smoothness
+        # for k in range(M):  # payload acceleration
+        #     pl_a = ca.vertcat(
+        #         pl_v[:, k] - pl_v[:, k - 1] if k > 0 else ca.DM.zeros(3, 1)
+        #     ) / dt
+        #     J += w_a * ca.sumsqr(pl_a)
+        # for k in range(M - 1):  # drone accelerations
+        #     J += w_a * ca.sumsqr(cf_a[i][:, k])
+        for k in range(M - 2):  # drone jerks
             cf_j = (ca.vertcat(
                 cf_a[i][:, k + 1] - cf_a[i][:, k]
             )) / dt
             J += w_j * ca.sumsqr(cf_j)
-            # J += w_j * ca.sumsqr(cf_j[i][:, k])
+        for k in range(M - 3):  # drone snaps
+            cf_s = (ca.vertcat(
+                cf_a[i][:, k + 2] - 2 * cf_a[i][:, k + 1] + cf_a[i][:, k]
+            )) / (dt ** 2)
+            J += w_s * ca.sumsqr(cf_s)
     # J += w_goal * ca.sumsqr(pl_p[:, M - 1] - ca.DM(pl_p_ref[-1]))
     opti.minimize(J)
 
@@ -151,12 +165,10 @@ def solve_ocp(
     opti.set_initial(pl_p, pl_p_ref.T)
     opti.set_initial(pl_v, 0.0)
     # for i in range(3):
-        # for k in range(M):
-        #     opti.set_initial(cf_v[i][:, k], 0.0)
-        # for k in range(M - 1):
-        #     opti.set_initial(cf_a[i][:, k], 0.0)
-        # for k in range(M - 2):
-        #     opti.set_initial(cf_j[i][:, k], 0.0)
+    #     for k in range(M):
+    #         opti.set_initial(cf_v[i][:, k], 0.0)
+    #     for k in range(M - 1):
+    #         opti.set_initial(cf_a[i][:, k], 0.0)
 
     base_dirs = np.zeros((3, 3))
     for i in range(3):
@@ -274,4 +286,6 @@ def get_traj(traj='circle', loops=5, plot=True, save_csv=True, ros=False):
 
 
 if __name__ == "__main__":
-    get_traj(traj='ellipse', loops=5, plot=False, save_csv=True, ros=False)
+    get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False)
+    import matplotlib.pyplot as plt
+    plt.show()

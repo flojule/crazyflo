@@ -15,7 +15,7 @@ TIMESCALE = 1.0
 BUFFER_TIME = 2.0
 
 TAKEOFF_TIME = 2.0
-INITIAL_HEIGHT = 0.5
+INITIAL_HEIGHT = 0.4
 
 LANDING_TIME = 2.0
 
@@ -46,6 +46,7 @@ def main():
     allcfs.setParam('usd.logging', 1)  # enable logging
 
     for i in range(TRIALS):
+        print('uploading trajectories to crazyflies...')
         for i, cf in enumerate(allcfs.crazyflies):
             cf.uploadTrajectory(0, 0, traj_cfs[i])
 
@@ -54,14 +55,21 @@ def main():
         allcfs.takeoff(targetHeight=INITIAL_HEIGHT, duration=TAKEOFF_TIME)
         timeHelper.sleep(BUFFER_TIME)
 
+        for i, cf in enumerate(allcfs.crazyflies):
+            start = traj_cfs[i].eval(0.0)
+            x, y, _ = start.pos
+            yaw0 = start.yaw
+            cf.goTo((x, y, INITIAL_HEIGHT), yaw0, 2.0)
+            # timeHelper.sleep(BUFFER_TIME)
+
         print('press button to go to start position...')
         swarm.input.waitUntilButtonPressed()
         for i, cf in enumerate(allcfs.crazyflies):
             start = traj_cfs[i].eval(0.0)
             p0 = start.pos
             yaw0 = start.yaw
-            cf.goTo(p0, yaw0, 2.0)
-            timeHelper.sleep(BUFFER_TIME)
+            cf.goTo(p0, yaw0, 4.0)
+            # timeHelper.sleep(BUFFER_TIME)
 
         print('press button to start trajectory...')
         swarm.input.waitUntilButtonPressed()

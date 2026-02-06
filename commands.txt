@@ -69,7 +69,10 @@ gz sim -r worlds/crazyflie_world.sdf
 
 
 record
-ros2 bag record -o pose --topics \
+ros2 bag record --topics /cf1/pose /cf3/pose /cf3/pose /cf1/thrust /cf2/thrust /cf3/thrust
+
+
+
 /all/cmd_full_state
 /cf1/acceleration
 /cf1/cmd_full_state

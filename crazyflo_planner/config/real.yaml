@@ -49,18 +49,18 @@ robot_types:
           vars: ["acc.x", "acc.y", "acc.z"]
         power:
           frequency: 50
-          vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4",
-                 "motor.m1req", "motor.m2req", "motor.m3req", "motor.m4req",
-                 "rpm.m1", "rpm.m2", "rpm.m3", "rpm.m4"]
+          vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4",]
+                #  "motor.m1req", "motor.m2req", "motor.m3req", "motor.m4req",
+                #  "rpm.m1", "rpm.m2", "rpm.m3", "rpm.m4"]
         stabilizer:
           frequency: 10 # Hz
           vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw", "stabilizer.thrust"]
         stateEstimate:
           frequency: 10
-          vars: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z",
-                 "stateEstimate.vx", "stateEstimate.vy", "stateEstimate.vz",
-                 "stateEstimate.ax", "stateEstimate.ay", "stateEstimate.az",
-                 "stateEstimate.roll", "stateEstimate.pitch", "stateEstimate.yaw"]
+          vars: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z",]
+                #  "stateEstimate.vx", "stateEstimate.vy", "stateEstimate.vz",
+                #  "stateEstimate.ax", "stateEstimate.ay", "stateEstimate.az",
+                #  "stateEstimate.roll", "stateEstimate.pitch", "stateEstimate.yaw"]
 
   cf_mocap_deck:
     motion_capture:

@@ -18,9 +18,15 @@ ocp_path = Path.home() / ".ros/crazyflo_planner" / "data" / "ocp_solution.npz"
 ocp_data = np.load(ocp_path)
 
 # Load rosbag data
-ws_path = Path.home() /"winter-project/ws"
-bag_path = ws_path / "pose"
+ws_path = Path.home() /"winter-project/ws/bag"
+bag_path = ws_path / "pose1557"
 bag_data = cf_data.get_bag_data(bag_path)
+
+# offset and total time for plots
+t_offset = 11.0  # offset to align with ocp solution
+t_total = 10.0
+adjust_time_scale = True
+plot_pl_only = False  # only plot payload trajectory without drones
 
 # Save figures path
 figures_path = Path.home() / ".ros/crazyflo_planner" / "figures"
@@ -53,18 +59,25 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
     f_states.tight_layout()
 
 
-def plot_states_pl(t, pl_p, pl_v, pl_p_ref, linestyle='-'):
+def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-'):
     """Plot payload states."""
     a_states[0, 0].plot(t, pl_p[2, :], label="payload", color='k', linestyle=linestyle)
 
-    speeds = np.linalg.norm(pl_v[:, :], axis=0)
+    if pl_v is not None:
+        speeds = np.linalg.norm(pl_v[:, :], axis=0)
+    else:
+        speeds = np.linalg.norm(np.gradient(pl_p, t, axis=1), axis=0)
     a_states[1, 0].plot(t, speeds, label="payload", color='k', linestyle=linestyle)
 
-    accels = np.linalg.norm(np.gradient(pl_v, t, axis=1), axis=0)
+    if pl_v is not None:
+        accels = np.linalg.norm(np.gradient(pl_v, t, axis=1), axis=0)
+    else:
+        accels = np.linalg.norm(np.gradient(np.gradient(pl_p, t, axis=1), t, axis=1), axis=0)
     a_states[2, 0].plot(t, accels, label="payload", color='k', linestyle=linestyle)
 
     # payload reference trajectory
-    a_states[0, 0].plot(t, pl_p_ref[2, :], '-.', label="payload ref", color='gray')
+    if pl_p_ref is not None:
+        a_states[0, 0].plot(t, pl_p_ref[2, :], '-.', label="payload ref", color='gray')
 
     for ax in a_states.flatten():
         ax.grid()
@@ -73,10 +86,10 @@ def plot_states_pl(t, pl_p, pl_v, pl_p_ref, linestyle='-'):
     f_states.tight_layout()
 
 
-def plot_3d_cf(cf_p, linestyle='-'):
+def plot_3d_cf(cf_p, linestyle='-', label_suffix=''):
     """Plot 3D trajectory of drones."""
     for i in range(3):
-        a_3d.plot(cf_p[i, 0], cf_p[i, 1], cf_p[i, 2], label=f"drone {i+1}", color=colors[i], linestyle=linestyle)
+        a_3d.plot(cf_p[i, 0], cf_p[i, 1], cf_p[i, 2], label=f"drone {i+1}{label_suffix}", color=colors[i], linestyle=linestyle)
 
 
 def plot_3d_pl(pl_p, label='payload', color='k', linestyle='-'):
@@ -243,23 +256,47 @@ def plot_ocp(ocp_data: dict):
     plot_states_cf(t, cf_p, cf_v, cf_a)
     plot_states_pl(t, pl_p, pl_v, pl_p_ref)
     plot_constraints(cf_p, pl_p, cf_cable_t, cable_l)
-    plot_3d(cf_p, pl_p, pl_p_ref, cf_radius)
+    if not plot_pl_only:
+        plot_3d(cf_p, pl_p, pl_p_ref, cf_radius)
+    else:
+        plot_3d_pl(pl_p_ref, label='payload ref', color='gray', linestyle='-.')
+        plot_3d_pl(pl_p, label='payload', color='k', linestyle='-')
 
 
-def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0):
+def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5):
     """Plot data from rosbag dictionary."""
 
-    t = bag_data["t"] - t_offset
+    t = bag_data["t"]
+    if adjust_time_scale:
+        for ax in a_states.flatten():
+            ax.set_xlim(-1, t_total + 1)
+
+        t -= t_offset
+        # truncate data from 0 to t_total
+        mask = (t >= 0) & (t <= t_total)
+        t = t[mask]
+        bag_data["t"] = t
+        for key in bag_data.keys():
+            if key == "t":
+                continue
+            bag_data[key] = bag_data[key][:, mask]
+
     cf_p = np.stack([bag_data["cf1_p"], bag_data["cf2_p"], bag_data["cf3_p"]])
     # cf_v = np.stack([bag_data["cf1_v"], bag_data["cf2_v"], bag_data["cf3_v"]])
     # cf_a = np.stack([bag_data["cf1_a"], bag_data["cf2_a"], bag_data["cf3_a"]])
 
     plot_states_cf(t, cf_p, linestyle='--')
-    plot_3d_cf(cf_p, linestyle='--')
+    pl_p = get_pl_pose(cf_p, cable_l)
+    plot_states_pl(t, pl_p, linestyle='--')
+    if not plot_pl_only:
+        plot_3d_cf(cf_p, linestyle='--', label_suffix=' (bag)')
+    else:
+        plot_3d_pl(pl_p, label='payload (bag)', color='k', linestyle='--')
     set_3d_axis()
 
-    for ax in a_states.flatten():
-        ax.set_xlim(-1, t_total + 1)
+    # if adjust_time_scale:
+    #     for ax in a_states.flatten():
+    #         ax.set_xlim(-1, t_total + 1)
 
 
 def plot_error(ocp_data: dict, bag_data: dict, t_offset=0.0, t_total=10.0):
@@ -316,13 +353,76 @@ def plot_error(ocp_data: dict, bag_data: dict, t_offset=0.0, t_total=10.0):
     plot_states_error(t_new, p_err, v_err, a_err)
 
 
+def get_pl_pose(cf_p: np.ndarray, cable_l: float):
+    """Get payload position from rosbag data using cable geometry."""
+    cf_p = np.asarray(cf_p, dtype=float)
+    if cf_p.shape[0] != 3 or cf_p.shape[1] != 3:
+        raise ValueError(f"Expected cf_p shape (3,3,T), got {cf_p.shape}")
+
+    T = cf_p.shape[2]
+    pl_p = np.zeros((3, T), dtype=float)
+
+    for i in range(T):
+        c0 = cf_p[0, :, i]
+        c1 = cf_p[1, :, i]
+        c2 = cf_p[2, :, i]
+        pl_p[:, i] = get_pl_math(c0, c1, c2, cable_l)
+
+    return pl_p
+
+
+def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float, eps: float = 1e-12):
+    """
+    Return the lower (smaller z) intersection point of 3 spheres with equal radius r.
+    If no real intersection (due to noise), it returns the best-fit point on the line
+    and clamps the sqrt to 0 (tangent).
+    """
+    c0 = np.asarray(c0, dtype=float).reshape(3)
+    c1 = np.asarray(c1, dtype=float).reshape(3)
+    c2 = np.asarray(c2, dtype=float).reshape(3)
+
+    # Two plane equations: (c1-c0)·x = (||c1||^2 - ||c0||^2)/2 and same for c2
+    n1 = c1 - c0
+    n2 = c2 - c0
+
+    # Check degeneracy (centers nearly collinear / coincident)
+    if np.linalg.norm(n1) < eps or np.linalg.norm(n2) < eps or np.linalg.norm(np.cross(n1, n2)) < eps:
+        raise ValueError("Degenerate sphere configuration (centers nearly collinear or coincident).")
+
+    d1 = 0.5 * (np.dot(c1, c1) - np.dot(c0, c0))
+    d2 = 0.5 * (np.dot(c2, c2) - np.dot(c0, c0))
+
+    v = np.cross(n1, n2)
+    v_norm2 = np.dot(v, v)
+
+    N = np.vstack([n1, n2])      # (2,3)
+    d = np.array([d1, d2])       # (2,)
+    x0, *_ = np.linalg.lstsq(N, d, rcond=None)  # point on both planes
+
+    w = x0 - c0
+    a = v_norm2
+    b = 2.0 * np.dot(v, w)
+    c = np.dot(w, w) - r * r
+
+    disc = b * b - 4.0 * a * c
+    if disc < 0.0:
+        disc = 0.0
+
+    sqrt_disc = np.sqrt(disc)
+    t1 = (-b + sqrt_disc) / (2.0 * a)
+    t2 = (-b - sqrt_disc) / (2.0 * a)
+
+    p1 = x0 + t1 * v
+    p2 = x0 + t2 * v
+
+    return p1 if p1[2] <= p2[2] else p2
+
+
 if __name__ == "__main__":
 
-    t_offset = 21.6  # offset to align with ocp solution
-    t_total = 10.0
-
+    cable_l = ocp_data["cable_l"]
     plot_ocp(ocp_data)
-    plot_bag(bag_data, t_offset=t_offset, t_total=t_total)
+    plot_bag(bag_data, t_offset=t_offset, t_total=t_total, cable_l=cable_l)
     plot_error(ocp_data, bag_data, t_offset=t_offset, t_total=t_total)
 
     f_states.savefig(figures_path / "cf_plot.png")
