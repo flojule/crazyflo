@@ -47,12 +47,20 @@ robot_types:
         acceleration: 
           frequency: 10
           vars: ["acc.x", "acc.y", "acc.z"]
-        thrust:
+        power:
           frequency: 50
-          vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4"]
+          vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4",
+                 "motor.m1req", "motor.m2req", "motor.m3req", "motor.m4req",
+                 "rpm.m1", "rpm.m2", "rpm.m3", "rpm.m4"]
         stabilizer:
           frequency: 10 # Hz
-          vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw"]
+          vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw", "stabilizer.thrust"]
+        stateEstimate:
+          frequency: 10
+          vars: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z",
+                 "stateEstimate.vx", "stateEstimate.vy", "stateEstimate.vz",
+                 "stateEstimate.ax", "stateEstimate.ay", "stateEstimate.az",
+                 "stateEstimate.roll", "stateEstimate.pitch", "stateEstimate.yaw"]
 
   cf_mocap_deck:
     motion_capture:
@@ -83,7 +91,7 @@ all:
       enHighLevel: 1
     stabilizer:
       estimator: 2 # 1: complementary, 2: kalman
-      controller: 1 # 1: PID, 2: mellinger
+      controller: 2 # 1: PID, 2: mellinger
     # pid_attitude:
     #   roll_kp: 10
     #   roll_ki: 0

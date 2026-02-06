@@ -3,145 +3,330 @@ import numpy as np
 
 from pathlib import Path
 
+import cf_data
 
-def plot_states(t, pl_p, pl_v, cf_p, cf_v, cf_a, cf_t, pl_p_ref, L, cf_collision):
-    """Plot payload and drone states."""
-    figures_path = Path.home() / ".ros/crazyflo_planner" / "figures"
-    figures_path.mkdir(parents=True, exist_ok=True)
+# Create figures and axes
+f_states, a_states = plt.subplots(3, 2, sharex=True, figsize=(16, 10))
 
-    colors = ['r', 'g', 'b']
+f_constr, a_constr = plt.subplots(2, 2, sharex=True, figsize=(16, 10))
 
-    # cf info
-    fig, axes = plt.subplots(3, 2, sharex=True, figsize=(16, 10))
-    axes[0, 0].set_ylabel(f"Altitude [m]")
-    axes[1, 0].set_ylabel(f"Speed drone [m/s]")
-    axes[2, 0].set_ylabel(f"Acceleration drone [m/s]")
-    axes[0, 1].set_ylabel(f"Cable tension [N]")
-    axes[1, 1].set_ylabel(f"Cable angle [deg]")
-    axes[2, 1].set_ylabel(f"[m]")
-    axes[2, 0].set_xlabel("Time [s]")
-    axes[2, 1].set_xlabel("Time [s]")
+f_3d = plt.figure(figsize=(12, 12))
+a_3d = f_3d.add_subplot(projection="3d")
+
+# Load OCP data
+ocp_path = Path.home() / ".ros/crazyflo_planner" / "data" / "ocp_solution.npz"
+ocp_data = np.load(ocp_path)
+
+# Load rosbag data
+ws_path = Path.home() /"winter-project/ws"
+bag_path = ws_path / "pose"
+bag_data = cf_data.get_bag_data(bag_path)
+
+# Save figures path
+figures_path = Path.home() / ".ros/crazyflo_planner" / "figures"
+figures_path.mkdir(parents=True, exist_ok=True)
+
+colors = ['r', 'g', 'b']
+
+
+def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
+    """Plot drone states."""
+    a_states[0, 0].set_ylabel(f"Altitude [m]")
+    a_states[1, 0].set_ylabel(f"Speed drone [m/s]")
+    a_states[2, 0].set_ylabel(f"Acceleration drone [m/s]")
+    a_states[2, 0].set_xlabel("Time [s]")
+
     for i in range(3):
-        axes[0, 0].plot(t, cf_p[i, 2, :], label=f"Drone {i+1}", color=colors[i])
+        a_states[0, 0].plot(t, cf_p[i, 2, :], label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
 
-        speeds = np.linalg.norm(cf_v[i, :, :], axis=0)
-        axes[1, 0].plot(t, speeds, label=f"Drone {i+1}", color=colors[i])
+        if cf_v is not None:
+            speeds = np.linalg.norm(cf_v[i, :, :], axis=0)
+            a_states[1, 0].plot(t, speeds, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
+        if cf_a is not None:
+            accels = np.linalg.norm(cf_a[i, :, :], axis=0)
+            a_states[2, 0].plot(t[:-1], accels, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
 
-        accels = np.linalg.norm(cf_a[i, :, :], axis=0)
-        axes[2, 0].plot(t[:-1], accels, label=f"Drone {i+1}", color=colors[i])
-
-        axes[0, 1].plot(t[:-1], cf_t[i, :], label=f"Drone {i+1}", color=colors[i])
-
-        angles = np.arccos(-cf_p[i, 2, :] + pl_p[2, :])  # angle from vertical
-        angles *= 180.0 / np.pi  # to degrees
-        axes[1, 1].plot(t, angles, label=f"Drone {i+1}", color=colors[i])
-        # pos_errors = np.linalg.norm(cf_p[i, :, :] - pl_p, axis=0)
-        # axes[2, 1].plot(t, pos_errors, label=f"Drone {i+1} to Payload")
-
-        pos_cf_cf = np.linalg.norm(cf_p[(i+1) % 3, :, :] - cf_p[i, :, :], axis=0)
-        axes[2, 1].plot(t, pos_cf_cf, label=f"Drone {i+1} to Drone {(i+2)%3 +1}", color=colors[i])
-
-    axes[0, 0].plot(t, pl_p[2, :], 'k--', label="Payload")
-    axes[1, 0].plot(t, np.linalg.norm(pl_v, axis=0), 'k--', label="Payload")
-    axes[2, 1].plot(t, np.linalg.norm(pl_p - pl_p_ref, axis=0), '--',
-                    color='gray', label="Payload ref. error")
-
-    for ax in axes.flatten():
+    for ax in a_states.flatten():
         ax.grid()
         ax.legend()
-    plt.tight_layout()
 
-    fig.savefig(figures_path / "cf_plot.png")
+    f_states.tight_layout()
 
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection="3d")
 
-    ax.plot(pl_p[0],  pl_p[1],  pl_p[2],  label="payload", linewidth=3)
-    ax.plot(cf_p[0, 0], cf_p[0, 1], cf_p[0, 2], label="drone 1", color=colors[0])
-    ax.plot(cf_p[1, 0], cf_p[1, 1], cf_p[1, 2], label="drone 2", color=colors[1])
-    ax.plot(cf_p[2, 0], cf_p[2, 1], cf_p[2, 2], label="drone 3", color=colors[2])
+def plot_states_pl(t, pl_p, pl_v, pl_p_ref, linestyle='-'):
+    """Plot payload states."""
+    a_states[0, 0].plot(t, pl_p[2, :], label="payload", color='k', linestyle=linestyle)
+
+    speeds = np.linalg.norm(pl_v[:, :], axis=0)
+    a_states[1, 0].plot(t, speeds, label="payload", color='k', linestyle=linestyle)
+
+    accels = np.linalg.norm(np.gradient(pl_v, t, axis=1), axis=0)
+    a_states[2, 0].plot(t, accels, label="payload", color='k', linestyle=linestyle)
 
     # payload reference trajectory
-    ax.scatter(pl_p_ref[0, 0], pl_p_ref[1, 0], pl_p_ref[2, 0],
-               color='green', s=100, label="start")
-    ax.scatter(pl_p_ref[0, -1], pl_p_ref[1, -1], pl_p_ref[2, -1],
-               color='red', s=100, label="goal")
-    ax.plot(pl_p_ref[0, :], pl_p_ref[1, :], pl_p_ref[2, :], '--',
-            color='gray', label="reference")
+    a_states[0, 0].plot(t, pl_p_ref[2, :], '-.', label="payload ref", color='gray')
 
-    # plot cables at final time and spheres at drone positions
+    for ax in a_states.flatten():
+        ax.grid()
+        ax.legend()
+
+    f_states.tight_layout()
+
+
+def plot_3d_cf(cf_p, linestyle='-'):
+    """Plot 3D trajectory of drones."""
     for i in range(3):
-        ax.plot([cf_p[i, 0, -1], pl_p[0, -1]],
+        a_3d.plot(cf_p[i, 0], cf_p[i, 1], cf_p[i, 2], label=f"drone {i+1}", color=colors[i], linestyle=linestyle)
+
+
+def plot_3d_pl(pl_p, label='payload', color='k', linestyle='-'):
+    """Plot 3D trajectory of payload."""
+    a_3d.plot(pl_p[0],  pl_p[1],  pl_p[2],  label=label, color=color, linestyle=linestyle)
+
+
+def plot_3d(cf_p, pl_p, pl_p_ref, cf_radius):
+    """Plot 3D trajectory of drones and payload."""
+    for i in range(3):
+        a_3d.plot([cf_p[i, 0, -1], pl_p[0, -1]],
                 [cf_p[i, 1, -1], pl_p[1, -1]],
                 [cf_p[i, 2, -1], pl_p[2, -1]],
                 'k--', linewidth=1)
         u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
-        x = cf_collision / 2.0 * np.cos(u) * np.sin(v) + cf_p[i, 0, -1]
-        y = cf_collision / 2.0 * np.sin(u) * np.sin(v) + cf_p[i, 1, -1]
-        z = cf_collision / 2.0 * np.cos(v) + cf_p[i, 2, -1]
-        ax.plot_surface(x, y, z, color=colors[i], alpha=0.3)
+        x = cf_radius * np.cos(u) * np.sin(v) + cf_p[i, 0, -1]
+        y = cf_radius * np.sin(u) * np.sin(v) + cf_p[i, 1, -1]
+        z = cf_radius * np.cos(v) + cf_p[i, 2, -1]
+        a_3d.plot_surface(x, y, z, color=colors[i], alpha=0.3)
 
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("z")
-    ax.legend()
-    set_axis(ax)
+    plot_3d_cf(cf_p)
 
-    plt.tight_layout()
+    # payload reference trajectory
+    a_3d.scatter(pl_p_ref[0, 0], pl_p_ref[1, 0], pl_p_ref[2, 0],
+               color='orange', s=10, label="start")
+    a_3d.scatter(pl_p_ref[0, -1], pl_p_ref[1, -1], pl_p_ref[2, -1],
+               color='purple', s=10, label="goal")
 
-    fig.savefig(figures_path / "cf_3d.png")
-    plt.show()
+    for p, label, color, linestyle in [(pl_p, 'payload', 'k', '-'), (pl_p_ref, 'payload ref', 'gray', '-.')]:
+        plot_3d_pl(p, label=label, color=color, linestyle=linestyle)
 
 
-def set_axis(ax):
-    x0, x1 = ax.get_xlim3d()
-    y0, y1 = ax.get_ylim3d()
-    z0, z1 = ax.get_zlim3d()
+def set_3d_axis():
+    x0, x1 = a_3d.get_xlim3d()
+    y0, y1 = a_3d.get_ylim3d()
+    z0, z1 = a_3d.get_zlim3d()
     xc, yc, zc = (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2
     sx, sy, sz = (x1 - x0), (y1 - y0), (z1 - z0)
 
     s = max(sx, sy, sz)
     hx = hy = hz = s / 2
 
-    ax.set_xlim3d(xc - hx, xc + hx)
-    ax.set_ylim3d(yc - hy, yc + hy)
-    ax.set_zlim3d(zc - hz, zc + hz)
-    ax.set_box_aspect((1, 1, 1))
+    a_3d.set_xlim3d(xc - hx, xc + hx)
+    a_3d.set_ylim3d(yc - hy, yc + hy)
+    a_3d.set_zlim3d(zc - hz, zc + hz)
+    a_3d.set_box_aspect((1, 1, 1))
+
+    a_3d.set_xlabel("X [m]")
+    a_3d.set_ylabel("Y [m]")
+    a_3d.set_zlabel("Z [m]")
+    a_3d.legend()
+    f_3d.tight_layout()
 
 
-def plot_data(ocp_data):
+def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
+    """Plot constraints from OCP solution dictionary."""
+    # cable tension
+    a_constr[0, 0].set_ylabel(f"Cable tension [N]")
+    a_constr[0, 0].set_xlabel("Time [s]")
+    for i in range(3):
+        a_constr[0, 0].plot(cf_cable_t[i, :], label=f"Drone {i+1}", color=colors[i])
+    a_constr[0, 0].grid()
+    a_constr[0, 0].legend()
+
+    # cable angle
+    a_constr[0, 1].set_ylabel(f"Cable angle [deg]")
+    a_constr[0, 1].set_xlabel("Time [s]")
+    z_axis = np.array([0.0, 0.0, -1.0])  # "down" as vertical
+    for i in range(3):
+        cable = cf_p[i, :, :] - pl_p[:, :]          # (3, N)
+        cable_norm = np.linalg.norm(cable, axis=0)  # (N,)
+
+        # cos(theta) = (cable · z_axis) / ||cable||
+        cos_th = (cable.T @ z_axis) / (cable_norm + 1e-12)  # (N,)
+
+        # numerical safety
+        cos_th = np.clip(cos_th, -1.0, 1.0)
+
+        angles = np.degrees(np.arccos(cos_th))
+        a_constr[0, 1].plot(angles, label=f"Drone {i+1}", color=colors[i])
+    a_constr[0, 1].grid()
+    a_constr[0, 1].legend()
+
+    # drone collision
+    a_constr[1, 0].set_ylabel(f"Drone min. distance [m]")
+    a_constr[1, 0].set_xlabel("Time [s]")
+    for i in range(3):
+        pos_cf_cf = np.linalg.norm(cf_p[(i+1) % 3, :, :] - cf_p[i, :, :], axis=0)
+        a_constr[1, 0].plot(pos_cf_cf, label=f"Drone {i+1} to Drone {(i+2)%3 +1}", color=colors[i])
+    a_constr[1, 0].grid()
+    a_constr[1, 0].legend()
+
+    # # cable length
+    # a_constr[1, 1].set_ylabel(f"Cable length error [m]")
+    # a_constr[1, 1].set_xlabel("Time [s]")
+    # for i in range(3):
+    #     cable = cf_p[i, :, :] - pl_p[:, :]          # (3, N)
+    #     cable_norm = np.linalg.norm(cable, axis=0)  # (N,)
+    #     cable_error = cable_norm - cable_l
+    #     a_constr[1, 1].plot(cable_error, label=f"Drone {i+1}", color=colors[i])
+    # a_constr[1, 1].grid()
+    # a_constr[1, 1].legend()
+
+    f_constr.tight_layout()
+
+
+def plot_states_error(t, p_error, v_error=None, a_error=None):
+    """Plot error between OCP solution and rosbag data."""
+    a_states[0, 1].set_ylabel(f"Position error [m]")
+    a_states[1, 1].set_ylabel(f"Velocity error [m/s]")
+    a_states[2, 1].set_ylabel(f"Acceleration error [m/s]")
+    a_states[2, 1].set_xlabel("Time [s]")
+
+    for i in range(3):
+        a_states[0, 1].plot(t, p_error[i, :], label=f"Drone {i+1}", color=colors[i])
+        if v_error is not None:
+            a_states[1, 1].plot(t, v_error[i, :], label=f"Drone {i+1}", color=colors[i])
+        if a_error is not None:
+            a_states[2, 1].plot(t[:-1], a_error[i, :], label=f"Drone {i+1}", color=colors[i])
+
+    f_states.tight_layout()
+
+
+def resample(data: dict, t_new: np.ndarray) -> dict:
+    """Resample data to uniform time grid with step dt."""
+    t_old = data["t"]
+    resampled_data = {"t": t_new}
+
+    for key in data.keys():
+        if key == "t":
+            continue
+
+        signal_old = data[key]
+        if key == "cf1_a" or key == "cf2_a" or key == "cf3_a":
+            signal_new = np.vstack([
+                np.interp(t_new[:-1], t_old[:-1], signal_old[0, :]),
+                np.interp(t_new[:-1], t_old[:-1], signal_old[1, :]),
+                np.interp(t_new[:-1], t_old[:-1], signal_old[2, :])
+            ])
+        else:
+            signal_new = np.vstack([
+                np.interp(t_new, t_old, signal_old[0, :]),
+                np.interp(t_new, t_old, signal_old[1, :]),
+                np.interp(t_new, t_old, signal_old[2, :])
+            ])
+        resampled_data[key] = signal_new
+
+    return resampled_data
+
+
+def plot_ocp(ocp_data: dict):
     """Plot data from OCP solution dictionary."""
     t = ocp_data["t"]
     pl_p = ocp_data["pl_p"]
     pl_v = ocp_data["pl_v"]
-    cf1_p = ocp_data["cf1_p"]
-    cf2_p = ocp_data["cf2_p"]
-    cf3_p = ocp_data["cf3_p"]
-    cf1_v = ocp_data["cf1_v"]
-    cf2_v = ocp_data["cf2_v"]
-    cf3_v = ocp_data["cf3_v"]
-    cf1_a = ocp_data["cf1_a"]
-    cf2_a = ocp_data["cf2_a"]
-    cf3_a = ocp_data["cf3_a"]
-    cf1_t = ocp_data["cf1_t"]
-    cf2_t = ocp_data["cf2_t"]
-    cf3_t = ocp_data["cf3_t"]
-    cf1_d = ocp_data["cf1_d"]
-    cf2_d = ocp_data["cf2_d"]
-    cf3_d = ocp_data["cf3_d"]
-    cf_p = np.array([cf1_p, cf2_p, cf3_p])
-    cf_v = np.array([cf1_v, cf2_v, cf3_v])
-    cf_a = np.array([cf1_a, cf2_a, cf3_a])
-    cf_t = np.array([cf1_t, cf2_t, cf3_t])
+    cf_p = np.stack([ocp_data["cf1_p"], ocp_data["cf2_p"], ocp_data["cf3_p"]])
+    cf_v = np.stack([ocp_data["cf1_v"], ocp_data["cf2_v"], ocp_data["cf3_v"]])
+    cf_a = np.stack([ocp_data["cf1_a"], ocp_data["cf2_a"], ocp_data["cf3_a"]])
+    cf_cable_t = np.stack([ocp_data["cf1_cable_t"], ocp_data["cf2_cable_t"], ocp_data["cf3_cable_t"]])
     pl_p_ref = ocp_data["pl_p_ref"]
-    L = ocp_data["L"]
-    cf_collision = ocp_data["cf_collision"]
+    cable_l = ocp_data["cable_l"]
+    cf_radius = ocp_data["cf_radius"]
 
-    pl_p_ref = pl_p_ref.T  # (3, N+1)
+    plot_states_cf(t, cf_p, cf_v, cf_a)
+    plot_states_pl(t, pl_p, pl_v, pl_p_ref)
+    plot_constraints(cf_p, pl_p, cf_cable_t, cable_l)
+    plot_3d(cf_p, pl_p, pl_p_ref, cf_radius)
 
-    plot_states(t, pl_p, pl_v, cf_p, cf_v, cf_a, cf_t, pl_p_ref, L, cf_collision)
+
+def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0):
+    """Plot data from rosbag dictionary."""
+
+    t = bag_data["t"] - t_offset
+    cf_p = np.stack([bag_data["cf1_p"], bag_data["cf2_p"], bag_data["cf3_p"]])
+    # cf_v = np.stack([bag_data["cf1_v"], bag_data["cf2_v"], bag_data["cf3_v"]])
+    # cf_a = np.stack([bag_data["cf1_a"], bag_data["cf2_a"], bag_data["cf3_a"]])
+
+    plot_states_cf(t, cf_p, linestyle='--')
+    plot_3d_cf(cf_p, linestyle='--')
+    set_3d_axis()
+
+    for ax in a_states.flatten():
+        ax.set_xlim(-1, t_total + 1)
+
+
+def plot_error(ocp_data: dict, bag_data: dict, t_offset=0.0, t_total=10.0):
+    """Plot error between OCP solution and rosbag data."""
+
+    bag_min = {"t": bag_data["t"], "cf1_p": bag_data["cf1_p"], "cf2_p": bag_data["cf2_p"], "cf3_p": bag_data["cf3_p"]}
+    bag_min["t"] = bag_min["t"] - t_offset
+    ocp_min = {"t": ocp_data["t"], "cf1_p": ocp_data["cf1_p"], "cf2_p": ocp_data["cf2_p"], "cf3_p": ocp_data["cf3_p"],
+            "cf1_v": ocp_data["cf1_v"], "cf2_v": ocp_data["cf2_v"], "cf3_v": ocp_data["cf3_v"],
+            "cf1_a": ocp_data["cf1_a"], "cf2_a": ocp_data["cf2_a"], "cf3_a": ocp_data["cf3_a"]}
+
+    t_ocp = np.asarray(ocp_data["t"], dtype=float)
+    t_bag = np.asarray(bag_data["t"], dtype=float)
+
+    dt = max(np.median(np.diff(t_bag)), np.median(np.diff(t_ocp)))
+    t_new = np.arange(0, min(t_bag[-1], t_ocp[-1]), dt)
+
+    bag_r = resample(bag_min, t_new)
+    ocp_r = resample(ocp_min, t_new)
+
+    p_bag = np.stack([bag_r["cf1_p"], bag_r["cf2_p"], bag_r["cf3_p"]], axis=0)
+    p_ocp = np.stack([ocp_r["cf1_p"], ocp_r["cf2_p"], ocp_r["cf3_p"]], axis=0)
+
+    p_err = np.linalg.norm(p_ocp - p_bag, axis=1)
+
+    v_bag = np.stack([np.gradient(p_bag[i], t_new, axis=1) for i in range(3)], axis=0)
+
+    if all(k in ocp_r for k in ["cf1_v", "cf2_v", "cf3_v"]):
+        v_ocp = np.stack([ocp_r["cf1_v"], ocp_r["cf2_v"], ocp_r["cf3_v"]], axis=0)
+    else:
+        v_ocp = np.stack([np.gradient(p_ocp[i], t_new, axis=1) for i in range(3)], axis=0)
+
+    v_err = np.linalg.norm(v_ocp - v_bag, axis=1)
+
+    a_bag = np.stack([np.gradient(v_bag[i], t_new, axis=1) for i in range(3)], axis=0)
+
+    if all(k in ocp_r for k in ["cf1_a", "cf2_a", "cf3_a"]):
+        a_ocp = np.stack([ocp_r["cf1_a"], ocp_r["cf2_a"], ocp_r["cf3_a"]], axis=0)
+        # align lengths
+        n = min(a_ocp.shape[-1], a_bag.shape[-1])
+        a_err = np.linalg.norm(a_ocp[..., :n] - a_bag[..., :n], axis=1)
+
+        # time vector for accel error
+        if a_ocp.shape[-1] == len(t_new) - 1:
+            t_a = t_new[:-1]
+            t_a = t_a[:n]
+        else:
+            t_a = t_new[:n]
+    else:
+        a_ocp = np.stack([np.gradient(v_ocp[i], t_new, axis=1) for i in range(3)], axis=0)
+        a_err = np.linalg.norm(a_ocp - a_bag, axis=1)
+        t_a = t_new
+
+    plot_states_error(t_new, p_err, v_err, a_err)
 
 
 if __name__ == "__main__":
-    ocp_data = np.load("crazyflo_planner/data/ocp_solution.npz")
-    plot_data(ocp_data)
+
+    t_offset = 21.6  # offset to align with ocp solution
+    t_total = 10.0
+
+    plot_ocp(ocp_data)
+    plot_bag(bag_data, t_offset=t_offset, t_total=t_total)
+    plot_error(ocp_data, bag_data, t_offset=t_offset, t_total=t_total)
+
+    f_states.savefig(figures_path / "cf_plot.png")
+    f_constr.savefig(figures_path / "cf_constraints.png")
+    f_3d.savefig(figures_path / "cf_3d.png")
+
+    plt.show()

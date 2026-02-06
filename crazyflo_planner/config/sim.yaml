@@ -26,52 +26,6 @@ robot_types:
     big_quad: false
     firmware_logging:
       enabled: true
-  cf:
-    motion_capture:
-      enabled: false
-    big_quad: false
-    battery:
-      voltage_warning: 3.8  # V
-      voltage_critical: 3.7 # V
-    # firmware_params:
-    #   kalman:
-    #     pNAcc_xy: 1.0 # default 0.5
-    firmware_logging:
-      enabled: true
-      custom_topics:
-        poseKalman:
-          frequency: 10
-          vars: ["kalman.statePX", "kalman.statePY", "kalman.statePZ"]
-        twistKalman:
-          frequency: 10
-          vars: ["kalman.stateVX", "kalman.stateVY", "kalman.stateVZ"]
-        accKalman:
-          frequency: 10
-          vars: ["kalman.stateAX", "kalman.stateAY", "kalman.stateAZ"]
-        acceleration: 
-          frequency: 10
-          vars: ["acc.x", "acc.y", "acc.z"]
-        thrust:
-          frequency: 50
-          vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4"]
-        stabilizer:
-          frequency: 10 # Hz
-          vars: ["stabilizer.roll", "stabilizer.pitch", "stabilizer.yaw"]
-
-  cf_mocap_deck:
-    motion_capture:
-      enabled: true
-      # only if enabled; see motion_capture.yaml
-      marker: mocap_deck
-      dynamics: default
-    big_quad: false
-    battery:
-      voltage_warning: 3.8  # V
-      voltage_critical: 3.7 # V
-
-    # firmware_params:
-    #   kalman:
-    #     pNAcc_xy: 1.0 # default 0.5
 
 # global settings for all robots
 all:
@@ -87,28 +41,7 @@ all:
       enHighLevel: 1
     stabilizer:
       estimator: 2 # 1: complementary, 2: kalman
-      controller: 1 # 1: PID, 2: mellinger
-    # pid_attitude:
-    #   roll_kp: 10
-    #   roll_ki: 0
-    #   roll_kd: 0
-    #   pitch_kp: 10
-    #   pitch_ki: 0
-    #   pitch_kd: 0
-    # pid_rate:
-    #   roll_kp: 500
-    #   roll_ki: 500
-    #   roll_kd: 3.6
-    #   pitch_kp: 500
-    #   pitch_ki: 500
-    #   pitch_kd: 3.6
-    #   rateFiltEn: 1
-    # ring:
-    #   effect: 16 # 6: double spinner, 7: solid color, 16: packetRate
-    #   solidBlue: 255 # if set to solid color
-    #   solidGreen: 0 # if set to solid color
-    #   solidRed: 0 # if set to solid color
-    #   headlightEnable: 0
+      controller: 2 # 1: PID, 2: mellinger
     locSrv:
       extPosStdDev: 1e-3
       extQuatStdDev: 0.5e-1

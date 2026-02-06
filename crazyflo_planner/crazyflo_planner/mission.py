@@ -28,7 +28,7 @@ def main():
     timeHelper = swarm.timeHelper
     allcfs = swarm.allcfs
 
-    get_traj(ros=True)  # generate trajectories
+    # get_traj(ros=True)  # generate trajectories
     csv_cf1 = data_path / 'traj_cf1.csv'
     csv_cf2 = data_path / 'traj_cf2.csv'
     csv_cf3 = data_path / 'traj_cf3.csv'

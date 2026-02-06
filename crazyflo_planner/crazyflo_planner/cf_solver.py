@@ -13,7 +13,7 @@ def solve_ocp(
     pl_p_ref: np.ndarray,  # payload reference trajectory ( N+1, 3 )
     cf_p0: list[np.ndarray],  # initial drone positions
     t_grid: np.ndarray,  # time grid samples (N+1,)
-    L: float,  # cable length
+    cable_l: float,  # cable length
     pl_mass: float = 0.03,  # payload mass in kg
     g: float = 9.81,  # gravity acceleration
     v_max: float = 2.0,  # norm of velocity limits
@@ -24,7 +24,7 @@ def solve_ocp(
     tension_min: float = 0.05,  # min tension in N
     tension_max: float = 0.5,  # max tension in N
     # cf_pl_max: float = 0.015,  # crazyflie max payload in kg
-    cf_collision: float = 0.2,  # crazyflie distance drone-drone in m
+    cf_radius: float = 0.1,  # crazyflie radius for drone-drone collision in m
     w_p: float = 10.0,  # tracking weight
     w_a: float = 0.001,  # acceleration weight
     w_j: float = 0.001,  # jerk weight
@@ -49,7 +49,7 @@ def solve_ocp(
     cf_cable_t = [opti.variable(1, M - 1) for _ in range(3)]  # cable tensions
 
     def cf_p_it(i: int, k: int):  # drone i position at time step k
-        return pl_p[:, k] + L * cf_cable_dir[i][:, k]
+        return pl_p[:, k] + cable_l * cf_cable_dir[i][:, k]
 
     # ######### Constraints #########
     # Payload boundary conditions
@@ -84,9 +84,9 @@ def solve_ocp(
         d1 = cf_p_it(0, k) - cf_p_it(1, k)
         d2 = cf_p_it(1, k) - cf_p_it(2, k)
         d3 = cf_p_it(2, k) - cf_p_it(0, k)
-        opti.subject_to(ca.sumsqr(d1) >= cf_collision ** 2)
-        opti.subject_to(ca.sumsqr(d2) >= cf_collision ** 2)
-        opti.subject_to(ca.sumsqr(d3) >= cf_collision ** 2)
+        opti.subject_to(ca.sumsqr(d1) >= (cf_radius*2) ** 2)
+        opti.subject_to(ca.sumsqr(d2) >= (cf_radius*2) ** 2)
+        opti.subject_to(ca.sumsqr(d3) >= (cf_radius*2) ** 2)
 
     # Drones cable tension limits and unit directions
     for i in range(3):
@@ -160,7 +160,7 @@ def solve_ocp(
 
     base_dirs = np.zeros((3, 3))
     for i in range(3):
-        base_dirs[i] = (cf_p0[i] - pl_p_ref[0]) / L
+        base_dirs[i] = (cf_p0[i] - pl_p_ref[0]) / cable_l
         opti.set_initial(cf_cable_dir[i], np.tile(base_dirs[i].reshape(3, 1), (1, M)))
         opti.set_initial(cf_cable_t[i], 0.1)
 
@@ -176,7 +176,7 @@ def solve_ocp(
     cf_a_sol = [sol.value(cf_a[i]) for i in range(3)]
     cf_cable_dir_sol = [sol.value(cf_cable_dir[i]) for i in range(3)]
     cf_cable_t_sol = [sol.value(cf_cable_t[i]) for i in range(3)]
-    cf_p_sol = [pl_p_sol + L * cf_cable_dir_sol[i] for i in range(3)]
+    cf_p_sol = [pl_p_sol + cable_l * cf_cable_dir_sol[i] for i in range(3)]
 
     return {
         "t": t_grid,
@@ -184,46 +184,54 @@ def solve_ocp(
         "cf1_p": cf_p_sol[0], "cf2_p": cf_p_sol[1], "cf3_p": cf_p_sol[2],
         "cf1_v": cf_v_sol[0], "cf2_v": cf_v_sol[1], "cf3_v": cf_v_sol[2],
         "cf1_a": cf_a_sol[0], "cf2_a": cf_a_sol[1], "cf3_a": cf_a_sol[2],
-        "cf1_t": cf_cable_t_sol[0], "cf2_t": cf_cable_t_sol[1], "cf3_t": cf_cable_t_sol[2],
-        "cf1_d": cf_cable_dir_sol[0], "cf2_d": cf_cable_dir_sol[1], "cf3_d": cf_cable_dir_sol[2],
-        "pl_p_ref": pl_p_ref,
-        "L": L,
-        "cf_collision": cf_collision,
+        "cf1_cable_t": cf_cable_t_sol[0], "cf2_cable_t": cf_cable_t_sol[1], "cf3_cable_t": cf_cable_t_sol[2],
+        "cf1_cable_dir": cf_cable_dir_sol[0], "cf2_cable_dir": cf_cable_dir_sol[1], "cf3_cable_dir": cf_cable_dir_sol[2],
+        "pl_p_ref": pl_p_ref.T,
+        "cable_l": cable_l,
+        "cf_radius": cf_radius,
     }
 
 
-def get_traj(traj='circle', plot=True, save_csv=True, ros=False):
+def get_traj(traj='circle', loops=5, plot=True, save_csv=True, ros=False):
     """Solve an example OCP and export trajectories."""
-    cf_height = 1.0  # solve at 1m height
-    L = 0.5  # cable lengths
+    cf_height = 1.0  # solve at ~1m height
+    cable_l = 0.5  # cable lengths
     alpha = np.pi / 4.0  # rope angle
     gamma = 2.0 * np.pi / 3.0  # drone separation angle
-    pl_height = cf_height - L * np.cos(alpha)
+    pl_height = cf_height - cable_l * np.cos(alpha)
 
     # time
     T = 2.0  # total time
-    dt = 0.01  # 100 Hz
+    dt = 0.1  # 10 Hz
     N = int(T / dt)
     t_grid = np.linspace(0.0, T, N + 1)
 
-    if traj == 'circle':
+    if traj == 'ellipse':
         # payload ref trajectory: ellipse
-        r_A = 0.5
-        r_B = 0.2
-        p_ref = np.stack([
+        r_A = 0.6
+        r_B = 0.3
+        pl_p_ref = np.stack([
             r_A * (1.0 - np.cos(2 * np.pi * t_grid / T)),
             r_B * np.sin(2 * np.pi * t_grid / T),
             pl_height * np.ones(N + 1),
         ], axis=1)
-        pl_p_start = p_ref[0]
-        pl_p_goal = p_ref[-1]
+        pl_p_start = pl_p_ref[0]
+        pl_p_goal = pl_p_ref[-1]
     else:  # straight line
         pl_p_start = np.array([0.0, 0.0, pl_height])
         pl_p_goal = np.array([-0.5, 0.0, pl_height])
-        p_ref = np.stack([(1 - (k / N)) * pl_p_start + (k / N) * pl_p_goal for k in range(N + 1)], axis=0)
+        pl_p_ref = np.stack([(1 - (k / N)) * pl_p_start + (k / N) * pl_p_goal for k in range(N + 1)], axis=0)
+
+    if loops > 1:
+        # extend trajectory for infinite flight
+        p0 = pl_p_ref.copy()  # one loop, length N+1
+        pl_p_ref = np.concatenate([p0[:-1] for _ in range(loops - 1)] + [p0], axis=0)
+        T = T * loops
+        N = N * loops
+        t_grid = np.linspace(0.0, T, N + 1)
 
     # drone initial positions
-    cf_R = L * np.cos(alpha)  # radius of drone circle
+    cf_R = cable_l * np.cos(alpha)  # radius of drone formation
     cf_p0 = [
         np.array([cf_R * np.cos(0), cf_R * np.sin(0), cf_height]),
         np.array([cf_R * np.cos(gamma), cf_R * np.sin(gamma), cf_height]),
@@ -231,10 +239,10 @@ def get_traj(traj='circle', plot=True, save_csv=True, ros=False):
     ]
 
     sol = solve_ocp(
-        pl_p_ref=p_ref,
+        pl_p_ref=pl_p_ref,
         t_grid=t_grid,
         cf_p0=cf_p0,
-        L=L,
+        cable_l=cable_l,
     )
     print("Solved. Payload at:", sol["pl_p"][:, -1])
 
@@ -262,8 +270,8 @@ def get_traj(traj='circle', plot=True, save_csv=True, ros=False):
         np.savez(data_path / "ocp_solution.npz", **{k: v for k, v in sol.items()})
 
     if plot:
-        cf_plots.plot_data(sol)
+        cf_plots.plot_ocp(sol)
 
 
 if __name__ == "__main__":
-    get_traj(traj='circle', plot=True, save_csv=True, ros=False)
+    get_traj(traj='ellipse', loops=5, plot=False, save_csv=True, ros=False)

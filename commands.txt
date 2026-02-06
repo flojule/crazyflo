@@ -69,4 +69,41 @@ gz sim -r worlds/crazyflie_world.sdf
 
 
 record
-ros2 bag record -o pose --topics /cf1/pose /cf2/pose /cf3/pose
+ros2 bag record -o pose --topics \
+/all/cmd_full_state
+/cf1/acceleration
+/cf1/cmd_full_state
+/cf1/cmd_hover
+/cf1/cmd_position
+/cf1/cmd_vel_legacy
+/cf1/cmd_velocity_world
+/cf1/odom
+/cf1/pose
+/cf1/poseKalman
+/cf1/robot_description
+/cf1/stabilizer
+/cf1/thrust
+/cf2/acceleration
+/cf2/cmd_full_state
+/cf2/cmd_hover
+/cf2/cmd_position
+/cf2/cmd_vel_legacy
+/cf2/cmd_velocity_world
+/cf2/odom
+/cf2/pose
+/cf2/poseKalman
+/cf2/robot_description
+/cf2/stabilizer
+/cf2/thrust
+/cf3/acceleration
+/cf3/cmd_full_state
+/cf3/cmd_hover
+/cf3/cmd_position
+/cf3/cmd_vel_legacy
+/cf3/cmd_velocity_world
+/cf3/odom
+/cf3/pose
+/cf3/poseKalman
+/cf3/robot_description
+/cf3/stabilizer
+/cf3/thrust
