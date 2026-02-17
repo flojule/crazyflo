@@ -9,6 +9,10 @@ import numpy as np
 from geometry_msgs.msg import Pose, TransformStamped, PoseStamped
 from std_srvs.srv import Empty
 
+import scripts.uav_trajectory as uav_trajectory
+import scripts.generate_trajectory as generate_trajectory
+import scripts.plot_trajectory as plot_trajectory
+
 
 class PayloadState(Enum):
     """Payload attachment state."""

@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 import numpy as np
 
 from pathlib import Path
@@ -21,6 +22,7 @@ ocp_data = np.load(ocp_path)
 ws_path = Path.home() /"winter-project/ws/bag"
 bag_path = ws_path / "pose1557"
 bag_data = cf_data.get_bag_data(bag_path)
+bag_data = None
 
 # offset and total time for plots
 t_offset = 11.0  # offset to align with ocp solution
@@ -182,17 +184,6 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
     a_constr[1, 0].grid()
     a_constr[1, 0].legend()
 
-    # # cable length
-    # a_constr[1, 1].set_ylabel(f"Cable length error [m]")
-    # a_constr[1, 1].set_xlabel("Time [s]")
-    # for i in range(3):
-    #     cable = cf_p[i, :, :] - pl_p[:, :]          # (3, N)
-    #     cable_norm = np.linalg.norm(cable, axis=0)  # (N,)
-    #     cable_error = cable_norm - cable_l
-    #     a_constr[1, 1].plot(cable_error, label=f"Drone {i+1}", color=colors[i])
-    # a_constr[1, 1].grid()
-    # a_constr[1, 1].legend()
-
     f_constr.tight_layout()
 
 
@@ -261,6 +252,8 @@ def plot_ocp(ocp_data: dict):
     else:
         plot_3d_pl(pl_p_ref, label='payload ref', color='gray', linestyle='-.')
         plot_3d_pl(pl_p, label='payload', color='k', linestyle='-')
+
+    set_3d_axis()
 
 
 def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5):
@@ -418,15 +411,123 @@ def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float, eps: f
     return p1 if p1[2] <= p2[2] else p2
 
 
+def animate_ocp(ocp_data: dict, time=False):
+    t = ocp_data["t"]
+    if time:
+        dt = np.diff(t).mean()
+        interval = dt * 1000  # convert to milliseconds
+        interval = 100
+    else:
+        interval = 30  # fixed interval for smoother animation
+    
+    pl_p = ocp_data["pl_p"]          # (3, M)
+    cf_p = np.stack([
+        ocp_data["cf1_p"],
+        ocp_data["cf2_p"],
+        ocp_data["cf3_p"],
+    ])                               # (3 drones, 3, M)
+
+    cf_radius = ocp_data["cf_radius"]
+
+    M = pl_p.shape[1]
+
+    fig = plt.figure(figsize=(12, 12))
+    ax = fig.add_subplot(111, projection="3d")
+
+    # trajectory lines
+    pl_line, = ax.plot([], [], [], "k-", label="payload")
+    cf_lines = [ax.plot([], [], [], "-", label=f"cf{i+1}")[0] for i in range(3)]
+
+    # current markers
+    pl_point, = ax.plot([], [], [], "ko", markersize=6)
+    cf_points = [ax.plot([], [], [], "o", markersize=5)[0] for _ in range(3)]
+
+    # cables
+    cables = [ax.plot([], [], [], "r-")[0] for _ in range(3)]
+
+    ax.legend()
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+
+    # axis limits
+    all_pts = np.concatenate([pl_p, cf_p.reshape(-1, M)], axis=0)
+    lim = np.max(np.abs(all_pts)) * 1.2
+    ax.set_xlim(-lim, lim)
+    ax.set_ylim(-lim, lim)
+    ax.set_zlim(0, lim)
+
+    # labels
+    title = ax.set_title("t = 0.00 s")
+    cf_labels = [
+        ax.text(0, 0, 0, f"cf_{i+1}", fontsize=10, color="k")
+        for i in range(3)]
+
+    def update(k):
+        kk = k + 1
+
+        # ----- update title -----
+        title.set_text(f"t = {t[k]:.2f} s")
+
+        # payload trail
+        pl_line.set_data(pl_p[0, :kk], pl_p[1, :kk])
+        pl_line.set_3d_properties(pl_p[2, :kk])
+
+        pl_point.set_data([pl_p[0, k]], [pl_p[1, k]])
+        pl_point.set_3d_properties([pl_p[2, k]])
+
+        for i in range(3):
+            # drone trails
+            cf_lines[i].set_data(cf_p[i, 0, :kk], cf_p[i, 1, :kk])
+            cf_lines[i].set_3d_properties(cf_p[i, 2, :kk])
+
+            # drone points
+            x = cf_p[i, 0, k]
+            y = cf_p[i, 1, k]
+            z = cf_p[i, 2, k]
+
+            cf_points[i].set_data([x], [y])
+            cf_points[i].set_3d_properties([z])
+
+            # label next to drone
+            cf_labels[i].set_position((x, y))
+            cf_labels[i].set_3d_properties(z, zdir='z')
+
+            # cable
+            cables[i].set_data([pl_p[0, k], x], [pl_p[1, k], y])
+            cables[i].set_3d_properties([pl_p[2, k], z])
+
+        return [
+            pl_line, pl_point,
+            *cf_lines, *cf_points,
+            *cables, *cf_labels,
+            title
+        ]
+
+    anim = FuncAnimation(
+        fig,
+        update,
+        frames=M,
+        interval=interval)
+
+    plt.show()
+    return anim
+
+
 if __name__ == "__main__":
 
     cable_l = ocp_data["cable_l"]
     plot_ocp(ocp_data)
-    plot_bag(bag_data, t_offset=t_offset, t_total=t_total, cable_l=cable_l)
-    plot_error(ocp_data, bag_data, t_offset=t_offset, t_total=t_total)
+
+    if bag_data is not None:
+        plot_bag(bag_data, t_offset=t_offset, t_total=t_total, cable_l=cable_l)
+        plot_error(ocp_data, bag_data, t_offset=t_offset, t_total=t_total)
 
     f_states.savefig(figures_path / "cf_plot.png")
     f_constr.savefig(figures_path / "cf_constraints.png")
     f_3d.savefig(figures_path / "cf_3d.png")
+
+    anim = animate_ocp(ocp_data, time=True)
+    # anim.save(figures_path / "traj.gif", writer="pillow", fps=30)
 
     plt.show()

@@ -14,8 +14,8 @@ class Poly7Segment:
 
 def _poly7_from_endpoint_conditions(
     dt: float,
-    p0: float, v0: float, a0: float, j0: float,
-    p1: float, v1: float, a1: float, j1: float,
+    p0: float = 0.0, v0: float = 0.0, a0: float = 0.0, j0: float = 0.0,
+    p1: float = 0.0, v1: float = 0.0, a1: float = 0.0, j1: float = 0.0,
 ) -> np.ndarray:
     """
     Find coefficients a[0..7] such that:
@@ -68,10 +68,9 @@ def fit_poly7_piecewise(
     t: np.ndarray,
     pos: np.ndarray,
     yaw: None | np.ndarray = None,
-    segment_every: int = 10,
-    jerk_end: float = 0.0,
 ) -> list[Poly7Segment]:
     """Fit piecewise poly7 segments through sampled positions."""
+
     t = np.asarray(t, dtype=float).reshape(-1)
     if pos.shape[0] == 3 and pos.ndim == 2:
         P = pos
@@ -110,6 +109,7 @@ def fit_poly7_piecewise(
     Vy = deriv1(yaw)
     Ay = deriv2(yaw)
 
+    segment_every = 10
     segments: list[Poly7Segment] = []
     idx = 0
     while idx < K - 1:
@@ -123,15 +123,15 @@ def fit_poly7_piecewise(
         for axis in range(3):
             c = _poly7_from_endpoint_conditions(
                 dt=dt_seg,
-                p0=float(P[axis, j0]), v0=float(V[axis, j0]), a0=float(A[axis, j0]), j0=jerk_end,
-                p1=float(P[axis, j1]), v1=float(V[axis, j1]), a1=float(A[axis, j1]), j1=jerk_end,
+                p0=float(P[axis, j0]), v0=float(V[axis, j0]), a0=float(A[axis, j0]),
+                p1=float(P[axis, j1]), v1=float(V[axis, j1]), a1=float(A[axis, j1])
             )
             coeffs.append(c)
 
         c_yaw = _poly7_from_endpoint_conditions(
             dt=dt_seg,
-            p0=float(yaw[j0]), v0=float(Vy[j0]), a0=float(Ay[j0]), j0=jerk_end,
-            p1=float(yaw[j1]), v1=float(Vy[j1]), a1=float(Ay[j1]), j1=jerk_end,
+            p0=float(yaw[j0]), v0=float(Vy[j0]), a0=float(Ay[j0]),
+            p1=float(yaw[j1]), v1=float(Vy[j1]), a1=float(Ay[j1]),
         )
 
         segments.append(

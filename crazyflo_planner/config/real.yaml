@@ -47,9 +47,9 @@ robot_types:
         acceleration: 
           frequency: 10
           vars: ["acc.x", "acc.y", "acc.z"]
-        power:
-          frequency: 50
-          vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4",]
+        # power:
+        #   frequency: 50
+        #   vars: ["motor.m1", "motor.m2", "motor.m3", "motor.m4",]
                 #  "motor.m1req", "motor.m2req", "motor.m3req", "motor.m4req",
                 #  "rpm.m1", "rpm.m2", "rpm.m3", "rpm.m4"]
         stabilizer:
@@ -58,9 +58,12 @@ robot_types:
         stateEstimate:
           frequency: 10
           vars: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z",]
-                #  "stateEstimate.vx", "stateEstimate.vy", "stateEstimate.vz",
-                #  "stateEstimate.ax", "stateEstimate.ay", "stateEstimate.az",
-                #  "stateEstimate.roll", "stateEstimate.pitch", "stateEstimate.yaw"]
+        # velocityEstimate:
+        #   frequency: 10
+        #   vars: ["velocityEstimate.vx", "velocityEstimate.vy", "velocityEstimate.vz"]
+        # accelerationEstimate:
+        #   frequency: 10
+        #   vars: ["accelerationEstimate.ax", "accelerationEstimate.ay", "accelerationEstimate.az"]
 
   cf_mocap_deck:
     motion_capture:
