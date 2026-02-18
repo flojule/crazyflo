@@ -6,8 +6,8 @@
 import numpy as np
 from pathlib import Path
 
-# import cf_poly7
 import poly7
+import cf_waypoints
 
 import casadi as ca
 
@@ -47,7 +47,8 @@ def solve_ocp(
     w_cf_pT: float = 1000.0,  # terminal position weight
 ) -> dict:
     """Solve the 3-drone payload OCP."""
-    segments = poly7.fit_poly7_piecewise(pl_waypoints, v_max, a_max, j_max)
+    pl_scale = 0.7  # scale down max payload velocity/acceleration
+    segments = poly7.fit_poly7_piecewise(pl_waypoints, v_max*pl_scale, a_max*pl_scale, j_max)
     t_grid = poly7.get_time_grid(segments)
     pl_p_ref = poly7.get_waypoint_positions(segments)
 
@@ -266,7 +267,7 @@ def solve_ocp(
     }
 
 
-def get_traj(traj='circle', loops=5, plot=True, save_csv=True, ros=False):
+def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
     """Solve an example OCP and export trajectories."""
     cf_height = 1.0  # solve at ~1m height
     cable_l = 0.5  # cable lengths
@@ -278,27 +279,22 @@ def get_traj(traj='circle', loops=5, plot=True, save_csv=True, ros=False):
     grid = np.linspace(0, 1, N + 1)  # points for traj
 
     if traj == 'ellipse':
-        # payload ref trajectory: ellipse
-        r_A = 0.6
-        r_B = 0.3
-        pl_waypoints = np.stack([
-            r_A * (1.0 - np.cos(2 * np.pi * grid)),
-            r_B * np.sin(2 * np.pi * grid),
-            pl_height * np.ones(grid.shape),
-        ], axis=1)
-        pl_p_start = pl_waypoints[0]
-        pl_p_goal = pl_waypoints[-1]
+        pl_waypoints = cf_waypoints.generate_ellipse(r_A=0.6, r_B=0.3, height=pl_height, grid=grid)
+    elif traj == 'figure8':
+        pl_waypoints = cf_waypoints.generate_figure8(r_A=0.6, r_B=0.3, height=pl_height, grid=grid)
+    elif traj == 'random':
+        start = np.array([0, 0, pl_height])
+        step_size = 0.5
+        pl_waypoints = cf_waypoints.generate_random_walk(start=start, step_size=step_size, grid=grid)
     else:  # straight line
-        pl_p_start = np.array([0, 0, pl_height])
-        pl_p_goal = np.array([1, 0, pl_height])
-        pl_waypoints = np.stack([(1 - (k / N)) * pl_p_start + (k / N) * pl_p_goal for k in range(N + 1)], axis=0)
+        start = np.array([0, 0, pl_height])
+        goal = np.array([1, 0, pl_height])
+        pl_waypoints = cf_waypoints.generate_line(start=start, end=goal, grid=grid)
 
     if loops > 1:
         # extend trajectory for infinite flight
         p0 = pl_waypoints.copy()  # one loop, length N+1
         pl_waypoints = np.concatenate([p0[:-1] for _ in range(loops - 1)] + [p0], axis=0)
-        N = N * loops
-        grid = np.linspace(0, 1, N + 1)
 
     # drone initial positions
     cf_R = cable_l * np.cos(alpha)  # radius of drone formation
