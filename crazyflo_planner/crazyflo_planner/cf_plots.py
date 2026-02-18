@@ -7,7 +7,7 @@ from pathlib import Path
 import cf_data
 
 # Create figures and axes
-f_states, a_states = plt.subplots(3, 2, sharex=True, figsize=(16, 10))
+f_states, a_states = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
 
 f_constr, a_constr = plt.subplots(2, 2, sharex=True, figsize=(16, 10))
 
@@ -39,10 +39,11 @@ colors = ['r', 'g', 'b']
 
 def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
     """Plot drone states."""
-    a_states[0, 0].set_ylabel(f"Altitude [m]")
-    a_states[1, 0].set_ylabel(f"Speed drone [m/s]")
-    a_states[2, 0].set_ylabel(f"Acceleration drone [m/s]")
-    a_states[2, 0].set_xlabel("Time [s]")
+    a_states[0, 0].set_ylabel("Altitude [m]")
+    a_states[1, 0].set_ylabel("Speed [m/s]")
+    a_states[2, 0].set_ylabel("Acceleration [m/s]")
+    a_states[3, 0].set_ylabel("Jerk [m/s]")
+    a_states[3, 0].set_xlabel("Time [s]")
 
     for i in range(3):
         a_states[0, 0].plot(t, cf_p[i, 2, :], label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
@@ -54,8 +55,10 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
             accels = np.linalg.norm(cf_a[i, :, :], axis=0)
             a_states[2, 0].plot(t[:-1], accels, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
 
+            # jerks = 
+
     for ax in a_states.flatten():
-        ax.grid()
+        ax.grid(True)
         ax.legend()
 
     f_states.tight_layout()
@@ -82,7 +85,7 @@ def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-'):
         a_states[0, 0].plot(t, pl_p_ref[2, :], '-.', label="payload ref", color='gray')
 
     for ax in a_states.flatten():
-        ax.grid()
+        ax.grid(True)
         ax.legend()
 
     f_states.tight_layout()
@@ -287,10 +290,6 @@ def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5):
         plot_3d_pl(pl_p, label='payload (bag)', color='k', linestyle='--')
     set_3d_axis()
 
-    # if adjust_time_scale:
-    #     for ax in a_states.flatten():
-    #         ax.set_xlim(-1, t_total + 1)
-
 
 def plot_error(ocp_data: dict, bag_data: dict, t_offset=0.0, t_total=10.0):
     """Plot error between OCP solution and rosbag data."""
@@ -364,12 +363,8 @@ def get_pl_pose(cf_p: np.ndarray, cable_l: float):
     return pl_p
 
 
-def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float, eps: float = 1e-12):
-    """
-    Return the lower (smaller z) intersection point of 3 spheres with equal radius r.
-    If no real intersection (due to noise), it returns the best-fit point on the line
-    and clamps the sqrt to 0 (tangent).
-    """
+def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float):
+    """Get the lower intersection point of 3 spheres with radius r."""
     c0 = np.asarray(c0, dtype=float).reshape(3)
     c1 = np.asarray(c1, dtype=float).reshape(3)
     c2 = np.asarray(c2, dtype=float).reshape(3)
@@ -379,6 +374,7 @@ def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float, eps: f
     n2 = c2 - c0
 
     # Check degeneracy (centers nearly collinear / coincident)
+    eps = 1e-12
     if np.linalg.norm(n1) < eps or np.linalg.norm(n2) < eps or np.linalg.norm(np.cross(n1, n2)) < eps:
         raise ValueError("Degenerate sphere configuration (centers nearly collinear or coincident).")
 
@@ -435,15 +431,15 @@ def animate_ocp(ocp_data: dict, time=False):
     ax = fig.add_subplot(111, projection="3d")
 
     # trajectory lines
-    pl_line, = ax.plot([], [], [], "k-", label="payload")
-    cf_lines = [ax.plot([], [], [], "-", label=f"cf{i+1}")[0] for i in range(3)]
+    pl_line, = ax.plot([], [], [], label="payload", color='k', linestyle='-', linewidth=1)
+    cf_lines = [ax.plot([], [], [],label=f"cf{i+1}", color=colors[i], linestyle='-', linewidth=1)[0] for i in range(3)]
 
     # current markers
-    pl_point, = ax.plot([], [], [], "ko", markersize=6)
-    cf_points = [ax.plot([], [], [], "o", markersize=5)[0] for _ in range(3)]
+    pl_point, = ax.plot([], [], [], "ko", markersize=10)
+    cf_points = [ax.plot([], [], [], "o", markersize=10, color=colors[i])[0] for i in range(3)]
 
     # cables
-    cables = [ax.plot([], [], [], "r-")[0] for _ in range(3)]
+    cables = [ax.plot([], [], [], "k--")[0] for _ in range(3)]
 
     ax.legend()
     ax.set_xlabel("x")
