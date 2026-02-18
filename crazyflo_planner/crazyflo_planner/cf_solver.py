@@ -24,7 +24,9 @@ def solve_ocp(
     thrust_min: float = -5.0,  # vertical acceleration limits
     thrust_max: float = 5.0,  # vertical acceleration limits
     tension_min: float = 0.05,  # min tension in N
-    tension_max: float = 0.5,  # max tension in N
+    tension_max: float = 0.15,  # max tension in N
+    # tension_z_max: float = 0.2,  # max vertical tension in N
+    theta_max: float = 75.0,  # max cable angle in degrees
     # cf_pl_max: float = 0.015,  # crazyflie max payload in kg
     cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
     w_pl_p: float = 1000.0,  # position weight
@@ -42,6 +44,7 @@ def solve_ocp(
     w_pl_pT: float = 1000.0,  # terminal position weight
     w_pl_vT: float = 10.0,  # terminal velocity weight
     w_pl_aT: float = 10.0,  # terminal acceleration weight
+    w_cf_pT: float = 1000.0,  # terminal position weight
 ) -> dict:
     """Solve the 3-drone payload OCP."""
     segments = poly7.fit_poly7_piecewise(pl_waypoints, v_max, a_max, j_max)
@@ -62,7 +65,7 @@ def solve_ocp(
     # cf_j = [opti.variable(3, M - 2) for _ in range(3)]  # drone jerks
     # cf_s = [opti.variable(3, M - 3) for _ in range(3)]  # drone snaps
     cf_cable_dir = [opti.variable(3, M) for _ in range(3)]  # unit cable directions
-    cf_cable_t = [opti.variable(1, M - 1) for _ in range(3)]  # cable tensions
+    cf_cable_t = [opti.variable(1, M) for _ in range(3)]  # cable tensions
 
     def cf_p_it(i: int, k: int):  # drone i position at time step k
         return pl_p[:, k] + cable_l * cf_cable_dir[i][:, k]
@@ -108,13 +111,14 @@ def solve_ocp(
     for i in range(3):
         for k in range(M):
             opti.subject_to(ca.sumsqr(cf_cable_dir[i][:, k]) == 1.0)
+            # opti.subject_to(cf_cable_t[i][:, k] * cf_cable_dir[i][2, k] >= tension_min)
+            # opti.subject_to(cf_cable_t[i][:, k] * cf_cable_dir[i][2, k] <= tension_max)
         opti.subject_to(cf_cable_t[i] >= tension_min)
         opti.subject_to(cf_cable_t[i] <= tension_max)
 
     # Cable angle
-    theta_max = np.deg2rad(75)
-    h_min = 0.05
-    tan2 = float(np.tan(theta_max)**2)
+    h_min = 0.05  # keep cf above payload
+    tan2 = float(np.tan(np.deg2rad(theta_max))**2)
 
     for i in range(3):
         for k in range(M):
@@ -182,6 +186,10 @@ def solve_ocp(
     J += w_pl_vT * ca.sumsqr(pl_v[:, M - 1])
     pl_a_T = ca.vertcat(pl_v[:, M-1] - pl_v[:, M-2]) / (t_grid[M-1] - t_grid[M-2])
     J += w_pl_aT * ca.sumsqr(pl_a_T)  # terminal acceleration energy
+
+    # cf terminal cost
+    for i in range(3):  # max z position
+        J += -w_cf_pT * cf_p_it(i, M - 1)[2]
 
     # cf smoothness
     for i in range(3):  
@@ -262,8 +270,8 @@ def get_traj(traj='circle', loops=5, plot=True, save_csv=True, ros=False):
     """Solve an example OCP and export trajectories."""
     cf_height = 1.0  # solve at ~1m height
     cable_l = 0.5  # cable lengths
-    alpha = np.pi / 4.0  # rope angle
-    gamma = 2.0 * np.pi / 3.0  # drone separation angle
+    alpha = np.pi / 4.0  # initial rope angle
+    gamma = 2.0 * np.pi / 3.0  # initial drone separation angle
     pl_height = cf_height - cable_l * np.cos(alpha)
 
     N = 20  # number of trajectory points per loop

@@ -55,7 +55,8 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
             accels = np.linalg.norm(cf_a[i, :, :], axis=0)
             a_states[2, 0].plot(t[:-1], accels, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
 
-            # jerks = 
+            jerks = np.linalg.norm(np.gradient(cf_a[i, :, :], t[:-1], axis=1), axis=0)
+            a_states[3, 0].plot(t[:-1], jerks, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
 
     for ax in a_states.flatten():
         ax.grid(True)
@@ -74,11 +75,11 @@ def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-'):
         speeds = np.linalg.norm(np.gradient(pl_p, t, axis=1), axis=0)
     a_states[1, 0].plot(t, speeds, label="payload", color='k', linestyle=linestyle)
 
-    if pl_v is not None:
-        accels = np.linalg.norm(np.gradient(pl_v, t, axis=1), axis=0)
-    else:
-        accels = np.linalg.norm(np.gradient(np.gradient(pl_p, t, axis=1), t, axis=1), axis=0)
+    accels = np.gradient(speeds, t, axis=0)
     a_states[2, 0].plot(t, accels, label="payload", color='k', linestyle=linestyle)
+
+    jerks = np.gradient(accels, t, axis=0)
+    a_states[3, 0].plot(t, jerks, label="payload", color='k', linestyle=linestyle)
 
     # payload reference trajectory
     if pl_p_ref is not None:
@@ -156,37 +157,44 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
     a_constr[0, 0].set_xlabel("Time [s]")
     for i in range(3):
         a_constr[0, 0].plot(cf_cable_t[i, :], label=f"Drone {i+1}", color=colors[i])
-    a_constr[0, 0].grid()
+    a_constr[0, 0].axhline(0.05, color='gray', linestyle='--', linewidth=2, label='min tension')
+    a_constr[0, 0].axhline(0.15, color='gray', linestyle='--', linewidth=2, label='max tension')
+    a_constr[0, 0].grid(True)
     a_constr[0, 0].legend()
+
+    # cable tension z component
+    a_constr[1, 0].set_ylabel(f"Cable tension z [N]")
+    a_constr[1, 0].set_xlabel("Time [s]")
+    for i in range(3):
+        a_constr[1, 0].plot(cf_cable_t[i, :] * (cf_p[i, 2, :] - pl_p[2, :]) / (cable_l), label=f"Drone {i+1}", color=colors[i])
+    a_constr[1, 0].axhline(0.15, color='gray', linestyle='--', linewidth=2, label='max tension')
+    a_constr[1, 0].grid(True)
+    a_constr[1, 0].legend()
 
     # cable angle
     a_constr[0, 1].set_ylabel(f"Cable angle [deg]")
     a_constr[0, 1].set_xlabel("Time [s]")
-    z_axis = np.array([0.0, 0.0, -1.0])  # "down" as vertical
+    z_axis = np.array([0.0, 0.0, 1.0])
     for i in range(3):
-        cable = cf_p[i, :, :] - pl_p[:, :]          # (3, N)
-        cable_norm = np.linalg.norm(cable, axis=0)  # (N,)
-
-        # cos(theta) = (cable · z_axis) / ||cable||
-        cos_th = (cable.T @ z_axis) / (cable_norm + 1e-12)  # (N,)
-
-        # numerical safety
-        cos_th = np.clip(cos_th, -1.0, 1.0)
-
+        cable = cf_p[i, :, :] - pl_p[:, :]
+        cos_th = (cable.T @ z_axis) / (cable_l)
         angles = np.degrees(np.arccos(cos_th))
         a_constr[0, 1].plot(angles, label=f"Drone {i+1}", color=colors[i])
-    a_constr[0, 1].grid()
+    a_constr[0, 1].axhline(75, color='gray', linestyle='--', linewidth=2, label='max angle')
+    a_constr[0, 1].grid(True)
     a_constr[0, 1].legend()
 
     # drone collision
-    a_constr[1, 0].set_ylabel(f"Drone min. distance [m]")
-    a_constr[1, 0].set_xlabel("Time [s]")
+    a_constr[1, 1].set_ylabel(f"Drone min distance [m]")
+    a_constr[1, 1].set_xlabel("Time [s]")
     for i in range(3):
         pos_cf_cf = np.linalg.norm(cf_p[(i+1) % 3, :, :] - cf_p[i, :, :], axis=0)
-        a_constr[1, 0].plot(pos_cf_cf, label=f"Drone {i+1} to Drone {(i+2)%3 +1}", color=colors[i])
-    a_constr[1, 0].grid()
-    a_constr[1, 0].legend()
+        a_constr[1, 1].plot(pos_cf_cf, label=f"Drone {i+1} to Drone {(i+2)%3 +1}", color=colors[i])
+    a_constr[1, 1].axhline(0.4, color='gray', linestyle='--', linewidth=2, label='min distance')
+    a_constr[1, 1].grid(True)
+    a_constr[1, 1].legend()
 
+    f_constr.suptitle("OCP Constraints")
     f_constr.tight_layout()
 
 
@@ -409,19 +417,19 @@ def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float):
 
 def animate_ocp(ocp_data: dict, time=False):
     t = ocp_data["t"]
-    if time:
-        dt = np.diff(t).mean()
-        interval = dt * 1000  # convert to milliseconds
-        interval = 100
-    else:
-        interval = 30  # fixed interval for smoother animation
-    
-    pl_p = ocp_data["pl_p"]          # (3, M)
-    cf_p = np.stack([
-        ocp_data["cf1_p"],
-        ocp_data["cf2_p"],
-        ocp_data["cf3_p"],
-    ])                               # (3 drones, 3, M)
+    # if time:
+    #     dt = np.diff(t).mean()
+    #     interval = dt * 1000  # convert to milliseconds
+    #     interval = 30
+    # else:
+    #     interval = 30
+    interval = 100
+
+    pl_p_ref = ocp_data["pl_p_ref"]
+    pl_p = ocp_data["pl_p"]
+    cf_p = np.stack([ocp_data["cf1_p"],
+                     ocp_data["cf2_p"],
+                     ocp_data["cf3_p"]])
 
     cf_radius = ocp_data["cf_radius"]
 
@@ -431,6 +439,7 @@ def animate_ocp(ocp_data: dict, time=False):
     ax = fig.add_subplot(111, projection="3d")
 
     # trajectory lines
+    pl_ref_line, = ax.plot([], [], [], label="payload ref", color='gray', linestyle='-.', linewidth=1)
     pl_line, = ax.plot([], [], [], label="payload", color='k', linestyle='-', linewidth=1)
     cf_lines = [ax.plot([], [], [],label=f"cf{i+1}", color=colors[i], linestyle='-', linewidth=1)[0] for i in range(3)]
 
@@ -461,13 +470,16 @@ def animate_ocp(ocp_data: dict, time=False):
 
     def update(k):
         kk = k + 1
-
-        # ----- update title -----
+    
         title.set_text(f"t = {t[k]:.2f} s")
 
         # payload trail
         pl_line.set_data(pl_p[0, :kk], pl_p[1, :kk])
         pl_line.set_3d_properties(pl_p[2, :kk])
+
+        # payload reference trail
+        pl_ref_line.set_data(pl_p_ref[0, :kk], pl_p_ref[1, :kk])
+        pl_ref_line.set_3d_properties(pl_p_ref[2, :kk])
 
         pl_point.set_data([pl_p[0, k]], [pl_p[1, k]])
         pl_point.set_3d_properties([pl_p[2, k]])
@@ -523,7 +535,7 @@ if __name__ == "__main__":
     f_constr.savefig(figures_path / "cf_constraints.png")
     f_3d.savefig(figures_path / "cf_3d.png")
 
-    anim = animate_ocp(ocp_data, time=True)
+    anim = animate_ocp(ocp_data)
     # anim.save(figures_path / "traj.gif", writer="pillow", fps=30)
 
     plt.show()
