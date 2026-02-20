@@ -6,9 +6,6 @@
 import numpy as np
 from pathlib import Path
 
-import poly7
-import cf_waypoints
-
 import casadi as ca
 
 
@@ -19,8 +16,8 @@ def solve_ocp(
     pl_mass: float = 0.03,  # payload mass in kg
     g: float = 9.81,  # gravity acceleration
     v_max: float = 2.0,  # norm of velocity limits
-    a_max: float = 10.0,  # norm of acceleration limits
-    j_max: float = 1000.0,  # norm of jerk limits
+    a_max: float = 5.0,  # norm of acceleration limits
+    j_max: float = 50.0,  # norm of jerk limits
     thrust_min: float = -5.0,  # vertical acceleration limits
     thrust_max: float = 5.0,  # vertical acceleration limits
     tension_min: float = 0.05,  # min tension in N
@@ -37,7 +34,7 @@ def solve_ocp(
     w_cf_p: float = 100.0,  # position weight
     w_cf_v: float = 0.001,  # velocity weight
     w_cf_a: float = 0.001,  # acceleration weight
-    w_cf_j: float = 0.01,  # jerk weight
+    w_cf_j: float = 0.1,  # jerk weight
     w_cf_s: float = 0.1,  # snap weight
     w_tension: float = 1.0,  # tension weight
     w_dtension: float = 10.0,  # tension change weight
@@ -45,8 +42,14 @@ def solve_ocp(
     w_pl_vT: float = 10.0,  # terminal velocity weight
     w_pl_aT: float = 10.0,  # terminal acceleration weight
     w_cf_pT: float = 1000.0,  # terminal position weight
+    ros: bool = False,
 ) -> dict:
     """Solve the 3-drone payload OCP."""
+    if ros:
+        from . import poly7
+    else:
+        import poly7
+
     pl_scale = 0.7  # scale down max payload velocity/acceleration
     segments = poly7.fit_poly7_piecewise(pl_waypoints, v_max*pl_scale, a_max*pl_scale, j_max)
     t_grid = poly7.get_time_grid(segments)
@@ -269,6 +272,15 @@ def solve_ocp(
 
 def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
     """Solve an example OCP and export trajectories."""
+    if ros:
+        from . import cf_plots
+        from . import poly7
+        from . import cf_waypoints
+    else:
+        import cf_plots
+        import poly7
+        import cf_waypoints
+
     cf_height = 1.0  # solve at ~1m height
     cable_l = 0.5  # cable lengths
     alpha = np.pi / 4.0  # initial rope angle
@@ -308,15 +320,9 @@ def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
         pl_waypoints=pl_waypoints,
         cf_p0=cf_p0,
         cable_l=cable_l,
+        ros=ros,
     )
     print("Solved. Payload at:", sol["pl_p"][:, -1])
-
-    if ros:
-        from . import cf_plots
-        from .poly7 import fit_poly7_piecewise, write_multi_csv
-    else:
-        import cf_plots
-        from poly7 import fit_poly7_piecewise, write_multi_csv
 
     if save_csv:
         print("Saving trajectories...")
@@ -325,12 +331,12 @@ def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
 
         cf_name = ["cf1", "cf2", "cf3"]
         for cf in cf_name:
-            segs = fit_poly7_piecewise(
+            segs = poly7.fit_poly7_piecewise(
                 p=sol[f"{cf}_p"],
                 t_grid=sol["t"],
             )
             out = data_path / f"traj_{cf}.csv"
-            write_multi_csv(out, segs)
+            poly7.write_multi_csv(out, segs)
             print(f"Wrote {out} with {len(segs)} segments")
 
         np.savez(data_path / "ocp_solution.npz", **{k: v for k, v in sol.items()})

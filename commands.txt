@@ -1,29 +1,16 @@
+
+cfclient
+source ~/winter-project/venvs/cfclientpython/bin/activate
+
+crazyflo
 source /opt/ros/jazzy/setup.bash
+
 source install/setup.bash
 source ~/winter-project/venvs/crazyswarm2/bin/activate
-deactivate
 
-source ~/winter-project/venvs/cfclientpython/bin/activate
-cfclient
+ros2 launch crazyflo_planner real.launch.xml 
+ros2 run crazyflo_planner mission
 
-export AMENT_PYTHON_EXECUTABLE="$(which python3)"
-export PYTHON_EXECUTABLE="$(which python3)"
-
-SWARM:
-ros2 launch crazyflo_planner launch.py
-ros2 service call /all/takeoff crazyflie_interfaces/srv/Takeoff "{group_mask: 0, height: 1.0, duration: {sec: 2, nanosec: 0}}"
-ros2 service call /all/go_to crazyflie_interfaces/srv/GoTo "{goal: {x: 1.0, y: 1.0, z: 2.0}, relative: 1}"
-ros2 service call /all/land crazyflie_interfaces/srv/Land "{group_mask: 0, height: 0.0, duration: {sec: 2, nanosec: 0}}"
-
-ONE:
-ros2 service call /cf1/takeoff crazyflie_interfaces/srv/Takeoff "{group_mask: 0, height: 0.5, duration: {sec: 1, nanosec: 0}}"
-ros2 service call /cf1/go_to crazyflie_interfaces/srv/GoTo "goal: {x: 0.2, y: 0.0, z: 0.6}"
-ros2 service call /cf1/land crazyflie_interfaces/srv/Land "{group_mask: 0, height: 0.0, duration: {sec: 1, nanosec: 0}}"
-
-ros2 run crazyflo_planner figure8
-ros2 run crazyflie_examples figure8
-
-ros2 service call /all/emergency std_srvs/srv/Empty
 
 srv/
 crazyflie_interfaces/srv/AddLogging

@@ -20,9 +20,6 @@ def _poly7_from_endpoint_conditions(
     if not np.isfinite(dt) or dt <= 0.0:
         raise ValueError(f"Bad dt: {dt}")
 
-    # Work in normalized time s in [0,1], where t = dt*s.
-    # Convert derivatives from t-domain to s-domain:
-    # v_s = v_t * dt, a_s = a_t * dt^2, j_s = j_t * dt^3
     v0s = v0 * dt
     v1s = v1 * dt
     a0s = a0 * (dt * dt)
@@ -162,9 +159,9 @@ def _finite_derivatives(t: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.nd
 
 def fit_poly7_piecewise(
     p: np.ndarray,
-    v_max: float = 100.0,
-    a_max: float = 1000.0,
-    j_max: float = 10000.0,
+    v_max: float = 5.0,
+    a_max: float = 10.0,
+    j_max: float = 50.0,
     t_grid: Optional[np.ndarray] = None,
     yaw_waypoints: Optional[np.ndarray] = None,
     max_iter: int = 50,
@@ -310,28 +307,6 @@ def fit_poly7_piecewise(
     return build_segments(seg_T_work)
 
 
-def _poly7_eval(coeffs: np.ndarray, t: np.ndarray) -> np.ndarray:
-    """Evaluate poly7 with coeffs a0..a7 at times t (vector)."""
-    coeffs = np.asarray(coeffs, dtype=float).reshape(8)
-    t = np.asarray(t, dtype=float)
-    # Horner
-    y = np.zeros_like(t, dtype=float)
-    for a in coeffs[::-1]:
-        y = y * t + a
-    return y
-
-
-def _poly7_derivative_coeffs(coeffs: np.ndarray, order: int) -> np.ndarray:
-    """Return coeffs for the derivative polynomial (still in power basis)."""
-    c = np.asarray(coeffs, dtype=float).copy()
-    for _ in range(order):
-        dc = np.zeros_like(c)
-        for n in range(1, c.size):
-            dc[n - 1] = n * c[n]
-        c = dc
-    return c
-
-
 def sample_segments(
     segments: Iterable,
     dt: float,
@@ -383,28 +358,28 @@ def sample_segments(
         t_global = t0_global + t_local
 
         # position
-        x = _poly7_eval(seg.coeffs_x, t_local)
-        y = _poly7_eval(seg.coeffs_y, t_local)
-        z = _poly7_eval(seg.coeffs_z, t_local)
+        x = _poly_eval(seg.coeffs_x, t_local)
+        y = _poly_eval(seg.coeffs_y, t_local)
+        z = _poly_eval(seg.coeffs_z, t_local)
         p = np.stack([x, y, z], axis=1)
 
         # yaw
-        yaw = _poly7_eval(seg.coeffs_yaw, t_local)
+        yaw = _poly_eval(seg.coeffs_yaw, t_local)
 
         # velocity/acc/jerk
-        vx = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_x, 1), t_local)
-        vy = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_y, 1), t_local)
-        vz = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_z, 1), t_local)
+        vx = _poly_eval(_poly_derivative_coeffs(seg.coeffs_x, 1), t_local)
+        vy = _poly_eval(_poly_derivative_coeffs(seg.coeffs_y, 1), t_local)
+        vz = _poly_eval(_poly_derivative_coeffs(seg.coeffs_z, 1), t_local)
         v = np.stack([vx, vy, vz], axis=1)
 
-        ax = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_x, 2), t_local)
-        ay = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_y, 2), t_local)
-        az = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_z, 2), t_local)
+        ax = _poly_eval(_poly_derivative_coeffs(seg.coeffs_x, 2), t_local)
+        ay = _poly_eval(_poly_derivative_coeffs(seg.coeffs_y, 2), t_local)
+        az = _poly_eval(_poly_derivative_coeffs(seg.coeffs_z, 2), t_local)
         a = np.stack([ax, ay, az], axis=1)
 
-        jx = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_x, 3), t_local)
-        jy = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_y, 3), t_local)
-        jz = _poly7_eval(_poly7_derivative_coeffs(seg.coeffs_z, 3), t_local)
+        jx = _poly_eval(_poly_derivative_coeffs(seg.coeffs_x, 3), t_local)
+        jy = _poly_eval(_poly_derivative_coeffs(seg.coeffs_y, 3), t_local)
+        jz = _poly_eval(_poly_derivative_coeffs(seg.coeffs_z, 3), t_local)
         j = np.stack([jx, jy, jz], axis=1)
 
         # append

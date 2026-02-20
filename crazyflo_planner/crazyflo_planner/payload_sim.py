@@ -6,12 +6,8 @@ from visualization_msgs.msg import Marker
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy
 from tf2_ros import TransformBroadcaster, TransformListener, Buffer, TransformException
 import numpy as np
-from geometry_msgs.msg import Pose, TransformStamped, PoseStamped
+from geometry_msgs.msg import Pose, TransformStamped
 from std_srvs.srv import Empty
-
-import scripts.uav_trajectory as uav_trajectory
-import scripts.generate_trajectory as generate_trajectory
-import scripts.plot_trajectory as plot_trajectory
 
 
 class PayloadState(Enum):
