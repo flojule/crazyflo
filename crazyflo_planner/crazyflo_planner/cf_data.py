@@ -66,6 +66,10 @@ def get_bag_data(bag_path):
 
     for j in range(3):
         pose = poses[j]
+        if pose not in bag_data_topics or len(bag_data_topics[pose]) == 0:
+            t[j] = np.array([])
+            cf_p[j] = np.empty((3, 0))
+            continue
         for i in range(len(bag_data_topics[pose])):
             t_ = bag_data_topics[pose][i]["msg"]["header"]["stamp"]["sec"] + bag_data_topics[pose][i]["msg"]["header"]["stamp"]["nanosec"] * 1e-9
             t[j].append(t_)
@@ -87,23 +91,31 @@ def get_bag_data(bag_path):
         # cf_v[j] = np.array(cf_v[j]).T  # (3, N)
         # cf_a[j] = np.array(cf_a[j]).T  # (3, N)
 
-    # find common time range
-    t_start = max(t1[0], t2[0], t3[0])
-    t_end = min(t1[-1], t2[-1], t3[-1])
-    # average dt
-    dt = np.median(np.diff(t1))
-    t_new = np.arange(0, t_end - t_start, dt)
+    if len(t2) == 0 or len(t3) == 0:
+        t_new = np.asarray(t1)
+    else:
+        # find common time range
+        t_start = max(t1[0], t2[0], t3[0])
+        t_end = min(t1[-1], t2[-1], t3[-1])
+        # average dt
+        dt = np.median(np.diff(t1))
+        t_new = np.arange(0, t_end - t_start, dt)
 
     cf_p_new, cf_v_new, cf_a_new = [], [], []
     for j in range(3):
-        pose = np.vstack([
-            np.interp(t_new, t[j], cf_p[j][0, :]),
-            np.interp(t_new, t[j], cf_p[j][1, :]),
-            np.interp(t_new, t[j], cf_p[j][2, :])
-        ])
-        cf_p_new.append(pose)
-        # cf_v[j] = np.interp(t_new, t[j], cf_v[j])
-        # cf_a[j] = np.interp(t_new, t[j], cf_a[j])
+        if len(t[j]) == 0:
+            cf_p_new.append(np.empty((3, len(t_new))))
+            cf_v_new.append(np.empty((3, len(t_new))))
+            cf_a_new.append(np.empty((3, len(t_new))))
+        else:
+            pose = np.vstack([
+                np.interp(t_new, t[j], cf_p[j][0, :]),
+                np.interp(t_new, t[j], cf_p[j][1, :]),
+                np.interp(t_new, t[j], cf_p[j][2, :])
+            ])
+            cf_p_new.append(pose)
+            # cf_v[j] = np.interp(t_new, t[j], cf_v[j])
+            # cf_a[j] = np.interp(t_new, t[j], cf_a[j])
 
     bag_data["t"] = t_new
     bag_data["cf1_p"] = cf_p_new[0]

@@ -7,30 +7,26 @@ from pathlib import Path
 import cf_data
 
 ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
+PLOT_OCP = True
+PLOT_BAG = False
+OFFSET_BAG = 0.0  # offset in seconds to align with ocp solution
 
-# Create figures and axes
-f_states, a_states = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
-
-f_constr, a_constr = plt.subplots(2, 2, sharex=True, figsize=(16, 10))
-
-f_3d = plt.figure(figsize=(12, 12))
-a_3d = f_3d.add_subplot(projection="3d")
 
 # Load OCP data
 ocp_path = ROOT_FOLDER / "data" / "ocp_solution.npz"
 ocp_data = np.load(ocp_path)
 
 # Load rosbag data
-ws_path = Path.home() /"winter-project/ws/bag"
-bag_path = ws_path / "pose1557"
+bag_path = Path.home() / "winter-project/ws/bag"
+bag_path = bag_path / "rosbag2_2026_02_06-17_56_10"
 bag_data = cf_data.get_bag_data(bag_path)
-# bag_data = None
 
-# offset and total time for plots
-t_offset = 11.0  # offset to align with ocp solution
-t_total = 10.0
-adjust_time_scale = True
-plot_pl_only = False  # only plot payload trajectory without drones
+# Create figures and axes
+f_states, a_states = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
+if PLOT_OCP:
+    f_constr, a_constr = plt.subplots(2, 2, sharex=True, figsize=(16, 10))
+f_3d = plt.figure(figsize=(12, 12))
+a_3d = f_3d.add_subplot(projection="3d")
 
 # Save figures path
 figures_path = ROOT_FOLDER / "figures"
@@ -48,17 +44,20 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
     a_states[3, 0].set_xlabel("Time [s]")
 
     for i in range(3):
-        a_states[0, 0].plot(t, cf_p[i, 2, :], label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
+        if len(cf_p[i, :, :]) == 0:
+            continue
+
+        a_states[0, 0].plot(t, cf_p[i, 2, :], label=f"Drone {i+1}", color=colors[i], linestyle=linestyle, linewidth=1)
 
         if cf_v is not None:
             speeds = np.linalg.norm(cf_v[i, :, :], axis=0)
-            a_states[1, 0].plot(t, speeds, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
+            a_states[1, 0].plot(t, speeds, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle, linewidth=1)
         if cf_a is not None:
             accels = np.linalg.norm(cf_a[i, :, :], axis=0)
-            a_states[2, 0].plot(t[:-1], accels, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
+            a_states[2, 0].plot(t[:-1], accels, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle, linewidth=1)
 
             jerks = np.linalg.norm(np.gradient(cf_a[i, :, :], t[:-1], axis=1), axis=0)
-            a_states[3, 0].plot(t[:-1], jerks, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle)
+            a_states[3, 0].plot(t[:-1], jerks, label=f"Drone {i+1}", color=colors[i], linestyle=linestyle, linewidth=1)
 
     for ax in a_states.flatten():
         ax.grid(True)
@@ -69,19 +68,19 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
 
 def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-'):
     """Plot payload states."""
-    a_states[0, 0].plot(t, pl_p[2, :], label="payload", color='k', linestyle=linestyle)
+    a_states[0, 0].plot(t, pl_p[2, :], label="payload", color='k', linestyle=linestyle, linewidth=1)
 
     if pl_v is not None:
         speeds = np.linalg.norm(pl_v[:, :], axis=0)
     else:
         speeds = np.linalg.norm(np.gradient(pl_p, t, axis=1), axis=0)
-    a_states[1, 0].plot(t, speeds, label="payload", color='k', linestyle=linestyle)
+    a_states[1, 0].plot(t, speeds, label="payload", color='k', linestyle=linestyle, linewidth=1)
 
     accels = np.gradient(speeds, t, axis=0)
-    a_states[2, 0].plot(t, accels, label="payload", color='k', linestyle=linestyle)
+    a_states[2, 0].plot(t, accels, label="payload", color='k', linestyle=linestyle, linewidth=1)
 
     jerks = np.gradient(accels, t, axis=0)
-    a_states[3, 0].plot(t, jerks, label="payload", color='k', linestyle=linestyle)
+    a_states[3, 0].plot(t, jerks, label="payload", color='k', linestyle=linestyle, linewidth=1)
 
     # payload reference trajectory
     if pl_p_ref is not None:
@@ -159,8 +158,8 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
     a_constr[0, 0].set_xlabel("Time [s]")
     for i in range(3):
         a_constr[0, 0].plot(cf_cable_t[i, :], label=f"Drone {i+1}", color=colors[i])
-    a_constr[0, 0].axhline(0.05, color='gray', linestyle='--', linewidth=2, label='min tension')
-    a_constr[0, 0].axhline(0.15, color='gray', linestyle='--', linewidth=2, label='max tension')
+    a_constr[0, 0].axhline(0.05, color='gray', linestyle='--', linewidth=1, label='min tension')
+    a_constr[0, 0].axhline(0.15, color='gray', linestyle='--', linewidth=1, label='max tension')
     a_constr[0, 0].grid(True)
     a_constr[0, 0].legend()
 
@@ -169,7 +168,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
     a_constr[1, 0].set_xlabel("Time [s]")
     for i in range(3):
         a_constr[1, 0].plot(cf_cable_t[i, :] * (cf_p[i, 2, :] - pl_p[2, :]) / (cable_l), label=f"Drone {i+1}", color=colors[i])
-    a_constr[1, 0].axhline(0.15, color='gray', linestyle='--', linewidth=2, label='max tension')
+    a_constr[1, 0].axhline(0.15, color='gray', linestyle='--', linewidth=1, label='max tension')
     a_constr[1, 0].grid(True)
     a_constr[1, 0].legend()
 
@@ -182,7 +181,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
         cos_th = (cable.T @ z_axis) / (cable_l)
         angles = np.degrees(np.arccos(cos_th))
         a_constr[0, 1].plot(angles, label=f"Drone {i+1}", color=colors[i])
-    # a_constr[0, 1].axhline(75, color='gray', linestyle='--', linewidth=2, label='max angle')
+    # a_constr[0, 1].axhline(75, color='gray', linestyle='--', linewidth=1, label='max angle')
     a_constr[0, 1].grid(True)
     a_constr[0, 1].legend()
 
@@ -192,7 +191,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
     for i in range(3):
         pos_cf_cf = np.linalg.norm(cf_p[(i+1) % 3, :, :] - cf_p[i, :, :], axis=0)
         a_constr[1, 1].plot(pos_cf_cf, label=f"Drone {i+1} to Drone {(i+2)%3 +1}", color=colors[i])
-    a_constr[1, 1].axhline(0.4, color='gray', linestyle='--', linewidth=2, label='min distance')
+    a_constr[1, 1].axhline(0.4, color='gray', linestyle='--', linewidth=1, label='min distance')
     a_constr[1, 1].grid(True)
     a_constr[1, 1].legend()
 
@@ -260,11 +259,7 @@ def plot_ocp(ocp_data: dict):
     plot_states_cf(t, cf_p, cf_v, cf_a)
     plot_states_pl(t, pl_p, pl_v, pl_p_ref)
     plot_constraints(cf_p, pl_p, cf_cable_t, cable_l)
-    if not plot_pl_only:
-        plot_3d(cf_p, pl_p, pl_p_ref, cf_radius)
-    else:
-        plot_3d_pl(pl_p_ref, label='payload ref', color='gray', linestyle='-.')
-        plot_3d_pl(pl_p, label='payload', color='k', linestyle='-')
+    plot_3d(cf_p, pl_p, pl_p_ref, cf_radius)
 
     set_3d_axis()
 
@@ -273,19 +268,18 @@ def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5):
     """Plot data from rosbag dictionary."""
 
     t = bag_data["t"]
-    if adjust_time_scale:
-        for ax in a_states.flatten():
-            ax.set_xlim(-1, t_total + 1)
+    for ax in a_states.flatten():
+        ax.set_xlim(-1, t_total + 1)
 
-        t -= t_offset
-        # truncate data from 0 to t_total
-        mask = (t >= 0) & (t <= t_total)
-        t = t[mask]
-        bag_data["t"] = t
-        for key in bag_data.keys():
-            if key == "t":
-                continue
-            bag_data[key] = bag_data[key][:, mask]
+    t -= t_offset
+    # truncate data from 0 to t_total
+    mask = (t >= 0) & (t <= t_total)
+    t = t[mask]
+    bag_data["t"] = t
+    for key in bag_data.keys():
+        if key == "t":
+            continue
+        bag_data[key] = bag_data[key][:, mask]
 
     cf_p = np.stack([bag_data["cf1_p"], bag_data["cf2_p"], bag_data["cf3_p"]])
     # cf_v = np.stack([bag_data["cf1_v"], bag_data["cf2_v"], bag_data["cf3_v"]])
@@ -293,11 +287,9 @@ def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5):
 
     plot_states_cf(t, cf_p, linestyle='--')
     pl_p = get_pl_pose(cf_p, cable_l)
-    plot_states_pl(t, pl_p, linestyle='--')
-    if not plot_pl_only:
-        plot_3d_cf(cf_p, linestyle='--', label_suffix=' (bag)')
-    else:
-        plot_3d_pl(pl_p, label='payload (bag)', color='k', linestyle='--')
+    if pl_p.shape[1] > 1:
+        plot_states_pl(t, pl_p, linestyle='--')
+    plot_3d_cf(cf_p, linestyle='--', label_suffix=' (bag)')
     set_3d_axis()
 
 
@@ -527,17 +519,22 @@ def animate_ocp(ocp_data: dict, time=False):
 if __name__ == "__main__":
 
     cable_l = ocp_data["cable_l"]
-    plot_ocp(ocp_data)
+    t_total = ocp_data["t"][-1] - ocp_data["t"][0]
 
-    if bag_data is not None:
-        plot_bag(bag_data, t_offset=t_offset, t_total=t_total, cable_l=cable_l)
-        plot_error(ocp_data, bag_data, t_offset=t_offset, t_total=t_total)
+    if PLOT_OCP:
+        plot_ocp(ocp_data)
+        anim = animate_ocp(ocp_data)
+        # anim.save(figures_path / "traj.gif", writer="pillow", fps=30)
+
+    if PLOT_BAG:
+        plot_bag(bag_data, t_offset=OFFSET_BAG, t_total=t_total, cable_l=cable_l)
+
+    if PLOT_OCP and PLOT_BAG:
+        plot_error(ocp_data, bag_data, t_offset=OFFSET_BAG, t_total=t_total)
 
     f_states.savefig(figures_path / "cf_plot.png")
-    f_constr.savefig(figures_path / "cf_constraints.png")
+    if PLOT_OCP:
+        f_constr.savefig(figures_path / "cf_constraints.png")
     f_3d.savefig(figures_path / "cf_3d.png")
-
-    anim = animate_ocp(ocp_data)
-    # anim.save(figures_path / "traj.gif", writer="pillow", fps=30)
 
     plt.show()

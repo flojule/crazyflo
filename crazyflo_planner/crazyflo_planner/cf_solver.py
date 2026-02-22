@@ -20,25 +20,22 @@ def solve_ocp(
     cf_v_max: float = 2.0,  # norm of velocity limits
     cf_a_max: float = 5.0,  # norm of acceleration limits
     cf_j_max: float = 50.0,  # norm of jerk limits
-    thrust_min: float = -5.0,  # vertical acceleration limits
-    thrust_max: float = 5.0,  # vertical acceleration limits
     tension_min: float = 0.05,  # min tension in N
     tension_max: float = 0.15,  # max tension in N
-    theta_max: float = 75.0,  # max cable angle in degrees
     cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
-    w_pl_p: float = 1.0,  # position weight
-    w_pl_v: float = 0.001,  # velocity weight
+    w_pl_p: float = 10.0,  # position weight
+    w_pl_v: float = 0.01,  # velocity weight
     w_pl_a: float = 0.001,  # acceleration weight
     w_pl_j: float = 0.0001,  # jerk weight
     w_pl_s: float = 0.0001,  # snap weight
     w_cf_p: float = 0.001,  # position weight
     w_cf_v: float = 0.001,  # velocity weight
     w_cf_a: float = 0.001,  # acceleration weight
-    w_cf_j: float = 0.001,  # jerk weight
-    w_cf_s: float = 0.001,  # snap weight
-    w_tension: float = 0.001,  # tension weight
-    w_dtension: float = 0.001,  # tension change weight
-    w_pl_pT: float = 0.1,  # terminal position weight
+    w_cf_j: float = 0.01,  # jerk weight
+    w_cf_s: float = 0.01,  # snap weight
+    w_tension: float = 0.0001,  # tension weight
+    w_dtension: float = 0.0001,  # tension change weight
+    w_pl_pT: float = 0.01,  # terminal position weight
     w_pl_vT: float = 0.001,  # terminal velocity weight
     w_pl_aT: float = 0.001,  # terminal acceleration weight
     w_cf_pT: float = 0.001,  # terminal position weight
@@ -60,6 +57,7 @@ def solve_ocp(
     print(f"min seg dt: {np.min(np.diff(t_grid)):.4f}")
     print(f"max seg dt: {np.max(np.diff(t_grid)):.4f}")
     pl_p_ref = states["p"].T
+    pl_v_ref = states["v"].T
 
     M = pl_p_ref.shape[1]  # number of reference points
 
@@ -86,7 +84,6 @@ def solve_ocp(
     opti.subject_to(pl_v[:, M - 1] == ca.DM.zeros(3, 1))
 
     # enforce static equilibrium at k=0 and k=M-1
-
     def sum_tension_vec(k: int):
         s = ca.MX.zeros(3, 1)
         for i in range(3):
@@ -178,10 +175,14 @@ def solve_ocp(
 
     # payload position tracking, jerk and snap energy minimization
     for k in range(M):
-        J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[:, k]))  # position tracking
+        # J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[:, k]))  # position tracking
 
         if k < M - 2:  # jerk
             dt_k = t_grid[k+1] - t_grid[k]
+
+            J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[:, k])) * dt_k  # position tracking
+            # J += w_pl_v * ca.sumsqr(pl_v[:, k] - ca.DM(pl_v_ref[:, k])) * dt_k  # velocity tracking
+
             pl_a = ca.vertcat(pl_v[:, k+1] - pl_v[:, k]) / dt_k
             dt_k1 = t_grid[k+2] - t_grid[k+1]
             pl_a_k1 = ca.vertcat(pl_v[:, k+2] - pl_v[:, k+1]) / dt_k1
@@ -303,7 +304,7 @@ def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
     gamma = 2.0 * np.pi / 3.0  # initial drone separation angle
     pl_height = cf_height - cable_l * np.cos(alpha)
 
-    N = 10  # number of trajectory points for one loop
+    N = 20  # number of trajectory points for one loop
     grid = np.linspace(0, 1, N + 1)  # points for traj
 
     if traj == 'ellipse':
