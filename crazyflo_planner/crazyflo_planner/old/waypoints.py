@@ -144,13 +144,11 @@ def smooth_traj(
     max_scale_per_iter: float = 5.0,  # prevents explosive growth
 ) -> DiscreteTrajectory3D:
     """
-    Constrained minimum-jerk smoothing on a dt grid (3D):
+    Constrained minimum-jerk smoothing on a dt grid:
       - hits waypoints exactly
       - discrete v/a/j == 0 at start and end (exact constraints)
       - C^3-like smoothness by minimizing sum of squared third differences
       - enforces v/a/j limits by increasing steps_per_seg (time stretching)
-
-    Uses dense KKT => O(n^3) solve; keep n <= max_samples.
     """
     wp = np.asarray(pl_waypoints, dtype=float)
     if wp.ndim != 2 or wp.shape[1] != 3 or wp.shape[0] < 2:
@@ -172,7 +170,6 @@ def smooth_traj(
                 f"Increase dt or use a sparse/CG solver."
             )
 
-        # Ensure idx[-1] matches K (if we forced K>=8, adjust last segment)
         if idx[-1] < K:
             steps[-1] += (K - int(idx[-1]))
             idx = _idx_from_steps(steps)

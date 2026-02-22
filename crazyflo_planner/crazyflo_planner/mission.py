@@ -2,10 +2,8 @@
 
 from pathlib import Path
 
-from ament_index_python import get_package_share_directory
 from crazyflie_py import Crazyswarm
 from crazyflie_py.uav_trajectory import Trajectory
-from cflib.crtp import scan_interfaces
 
 from crazyflo_planner.cf_solver import get_traj
 
@@ -19,7 +17,9 @@ INITIAL_HEIGHT = 0.4
 
 LANDING_TIME = 2.0
 
-data_path = Path.home() / ".ros/crazyflo_planner" / "data"
+ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
+
+data_path = ROOT_FOLDER / "data"
 
 
 def main():

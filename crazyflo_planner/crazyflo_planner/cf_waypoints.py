@@ -23,8 +23,10 @@ def generate_figure8(r_A, r_B, height, grid):
     return waypoints
 
 
-def generate_line(start, end, grid):
+def generate_line(start, end, grid=None):
     """Generate a straight line trajectory."""
+    if grid is None:
+        grid = np.linspace(0, 1, 2)
     waypoints = np.stack([np.linspace(start[0], end[0], grid.shape[0]),
                           np.linspace(start[1], end[1], grid.shape[0]),
                           np.linspace(start[2], end[2], grid.shape[0])

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import cf_data
 
+ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
+
 # Create figures and axes
 f_states, a_states = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
 
@@ -15,14 +17,14 @@ f_3d = plt.figure(figsize=(12, 12))
 a_3d = f_3d.add_subplot(projection="3d")
 
 # Load OCP data
-ocp_path = Path.home() / ".ros/crazyflo_planner" / "data" / "ocp_solution.npz"
+ocp_path = ROOT_FOLDER / "data" / "ocp_solution.npz"
 ocp_data = np.load(ocp_path)
 
 # Load rosbag data
 ws_path = Path.home() /"winter-project/ws/bag"
 bag_path = ws_path / "pose1557"
 bag_data = cf_data.get_bag_data(bag_path)
-bag_data = None
+# bag_data = None
 
 # offset and total time for plots
 t_offset = 11.0  # offset to align with ocp solution
@@ -31,7 +33,7 @@ adjust_time_scale = True
 plot_pl_only = False  # only plot payload trajectory without drones
 
 # Save figures path
-figures_path = Path.home() / ".ros/crazyflo_planner" / "figures"
+figures_path = ROOT_FOLDER / "figures"
 figures_path.mkdir(parents=True, exist_ok=True)
 
 colors = ['r', 'g', 'b']
@@ -180,7 +182,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l):
         cos_th = (cable.T @ z_axis) / (cable_l)
         angles = np.degrees(np.arccos(cos_th))
         a_constr[0, 1].plot(angles, label=f"Drone {i+1}", color=colors[i])
-    a_constr[0, 1].axhline(75, color='gray', linestyle='--', linewidth=2, label='max angle')
+    # a_constr[0, 1].axhline(75, color='gray', linestyle='--', linewidth=2, label='max angle')
     a_constr[0, 1].grid(True)
     a_constr[0, 1].legend()
 
@@ -470,7 +472,7 @@ def animate_ocp(ocp_data: dict, time=False):
 
     def update(k):
         kk = k + 1
-    
+
         title.set_text(f"t = {t[k]:.2f} s")
 
         # payload trail

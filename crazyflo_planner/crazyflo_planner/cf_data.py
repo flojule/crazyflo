@@ -90,7 +90,6 @@ def get_bag_data(bag_path):
     # find common time range
     t_start = max(t1[0], t2[0], t3[0])
     t_end = min(t1[-1], t2[-1], t3[-1])
-    print(f"Common time range: {t_start:.2f} to {t_end:.2f} s")
     # average dt
     dt = np.median(np.diff(t1))
     t_new = np.arange(0, t_end - t_start, dt)

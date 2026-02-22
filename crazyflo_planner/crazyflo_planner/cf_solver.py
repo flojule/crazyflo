@@ -8,40 +8,40 @@ from pathlib import Path
 
 import casadi as ca
 
+ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
+
 
 def solve_ocp(
-    pl_waypoints: np.ndarray,  # payload reference trajectory ( N+1, 3 )
+    pl_waypoints: np.ndarray,  # payload reference trajectory
     cf_p0: list[np.ndarray],  # initial drone positions
     cable_l: float,  # cable length
     pl_mass: float = 0.03,  # payload mass in kg
     g: float = 9.81,  # gravity acceleration
-    v_max: float = 2.0,  # norm of velocity limits
-    a_max: float = 5.0,  # norm of acceleration limits
-    j_max: float = 50.0,  # norm of jerk limits
+    cf_v_max: float = 2.0,  # norm of velocity limits
+    cf_a_max: float = 5.0,  # norm of acceleration limits
+    cf_j_max: float = 50.0,  # norm of jerk limits
     thrust_min: float = -5.0,  # vertical acceleration limits
     thrust_max: float = 5.0,  # vertical acceleration limits
     tension_min: float = 0.05,  # min tension in N
     tension_max: float = 0.15,  # max tension in N
-    # tension_z_max: float = 0.2,  # max vertical tension in N
     theta_max: float = 75.0,  # max cable angle in degrees
-    # cf_pl_max: float = 0.015,  # crazyflie max payload in kg
     cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
-    w_pl_p: float = 1000.0,  # position weight
+    w_pl_p: float = 1.0,  # position weight
     w_pl_v: float = 0.001,  # velocity weight
     w_pl_a: float = 0.001,  # acceleration weight
-    w_pl_j: float = 0.001,  # jerk weight
-    w_pl_s: float = 0.001,  # snap weight
-    w_cf_p: float = 100.0,  # position weight
+    w_pl_j: float = 0.0001,  # jerk weight
+    w_pl_s: float = 0.0001,  # snap weight
+    w_cf_p: float = 0.001,  # position weight
     w_cf_v: float = 0.001,  # velocity weight
     w_cf_a: float = 0.001,  # acceleration weight
-    w_cf_j: float = 0.1,  # jerk weight
-    w_cf_s: float = 0.1,  # snap weight
-    w_tension: float = 1.0,  # tension weight
-    w_dtension: float = 10.0,  # tension change weight
-    w_pl_pT: float = 1000.0,  # terminal position weight
-    w_pl_vT: float = 10.0,  # terminal velocity weight
-    w_pl_aT: float = 10.0,  # terminal acceleration weight
-    w_cf_pT: float = 1000.0,  # terminal position weight
+    w_cf_j: float = 0.001,  # jerk weight
+    w_cf_s: float = 0.001,  # snap weight
+    w_tension: float = 0.001,  # tension weight
+    w_dtension: float = 0.001,  # tension change weight
+    w_pl_pT: float = 0.1,  # terminal position weight
+    w_pl_vT: float = 0.001,  # terminal velocity weight
+    w_pl_aT: float = 0.001,  # terminal acceleration weight
+    w_cf_pT: float = 0.001,  # terminal position weight
     ros: bool = False,
 ) -> dict:
     """Solve the 3-drone payload OCP."""
@@ -50,12 +50,18 @@ def solve_ocp(
     else:
         import poly7
 
-    pl_scale = 0.7  # scale down max payload velocity/acceleration
-    segments = poly7.fit_poly7_piecewise(pl_waypoints, v_max*pl_scale, a_max*pl_scale, j_max)
-    t_grid = poly7.get_time_grid(segments)
-    pl_p_ref = poly7.get_waypoint_positions(segments)
+    pl_scale = 1.0  # scale max payload velocity/acceleration
+    segments = poly7.fit_poly7_piecewise(
+        pl_waypoints, cf_v_max*pl_scale, cf_a_max*pl_scale, cf_j_max*pl_scale)
 
-    M = pl_p_ref.shape[0]  # number of reference points
+    states = poly7.get_waypoint_states(segments)
+
+    t_grid = states["t"]
+    print(f"min seg dt: {np.min(np.diff(t_grid)):.4f}")
+    print(f"max seg dt: {np.max(np.diff(t_grid)):.4f}")
+    pl_p_ref = states["p"].T
+
+    M = pl_p_ref.shape[1]  # number of reference points
 
     opti = ca.Opti()
 
@@ -66,8 +72,6 @@ def solve_ocp(
     # cf_p = [opti.variable(3, M) for _ in range(3)]  # drone positions
     cf_v = [opti.variable(3, M) for _ in range(3)]  # drone velocities
     cf_a = [opti.variable(3, M - 1) for _ in range(3)]  # drone accelerations
-    # cf_j = [opti.variable(3, M - 2) for _ in range(3)]  # drone jerks
-    # cf_s = [opti.variable(3, M - 3) for _ in range(3)]  # drone snaps
     cf_cable_dir = [opti.variable(3, M) for _ in range(3)]  # unit cable directions
     cf_cable_t = [opti.variable(1, M) for _ in range(3)]  # cable tensions
 
@@ -76,31 +80,39 @@ def solve_ocp(
 
     # ######### Constraints #########
     # Payload boundary conditions
-    opti.subject_to(pl_p[:, 0] == pl_p_ref[0])
-    opti.subject_to(pl_p[:, M - 1] == pl_p_ref[-1])
+    opti.subject_to(pl_p[:, 0] == pl_p_ref[:, 0])
+    opti.subject_to(pl_p[:, M - 1] == pl_p_ref[:, M - 1])
     opti.subject_to(pl_v[:, 0] == ca.DM.zeros(3, 1))
     opti.subject_to(pl_v[:, M - 1] == ca.DM.zeros(3, 1))
 
+    # enforce static equilibrium at k=0 and k=M-1
+
+    def sum_tension_vec(k: int):
+        s = ca.MX.zeros(3, 1)
+        for i in range(3):
+            s += cf_cable_t[i][0, k] * cf_cable_dir[i][:, k]
+        return s
+
+    for k in [0, M-1]:
+        opti.subject_to(pl_v[:, k] == ca.DM.zeros(3, 1))
+        opti.subject_to(sum_tension_vec(k) == ca.DM([0.0, 0.0, pl_mass * g]))
+
     # Drones boundary conditions
     for i in range(3):
-        opti.subject_to(cf_p_it(i, 0) == cf_p0[i])
+        # opti.subject_to(cf_p_it(i, 0) == cf_p0[i])
+        # opti.subject_to(cf_p_it(i, 0)[2] == cf_p0[i][2])
+        # opti.subject_to(cf_p_it(i, M - 1)[2] == cf_p0[i][2])
         opti.subject_to(cf_v[i][:, 0] == ca.DM.zeros(3, 1))
         opti.subject_to(cf_v[i][:, M - 1] == ca.DM.zeros(3, 1))
         opti.subject_to(cf_a[i][:, 0] == ca.DM.zeros(3, 1))
         opti.subject_to(cf_a[i][:, M - 2] == ca.DM.zeros(3, 1))
-        # opti.subject_to(cf_j[i][:, 0] == ca.DM.zeros(3, 1))
-        # opti.subject_to(cf_j[i][:, M - 3] == ca.DM.zeros(3, 1))
 
     # Drones speed/acceleration/jerk limits
     for i in range(3):
         for k in range(M):
-            opti.subject_to(ca.sumsqr(cf_v[i][:, k]) <= v_max ** 2)
+            opti.subject_to(ca.sumsqr(cf_v[i][:, k]) <= cf_v_max ** 2)
         for k in range(M - 1):
-            opti.subject_to(ca.sumsqr(cf_a[i][:, k]) <= a_max ** 2)
-            opti.subject_to(cf_a[i][2, k] >= thrust_min)
-            opti.subject_to(cf_a[i][2, k] <= thrust_max)
-        # for k in range(M - 2):
-        #     opti.subject_to(ca.sumsqr(cf_j[i][:, k]) <= j_max ** 2)
+            opti.subject_to(ca.sumsqr(cf_a[i][:, k]) <= cf_a_max ** 2)
 
     # Drones collision avoidance
     for k in range(M):
@@ -114,23 +126,18 @@ def solve_ocp(
     # Drones cable tension limits and unit directions
     for i in range(3):
         for k in range(M):
-            opti.subject_to(ca.sumsqr(cf_cable_dir[i][:, k]) == 1.0)
-            # opti.subject_to(cf_cable_t[i][:, k] * cf_cable_dir[i][2, k] >= tension_min)
-            # opti.subject_to(cf_cable_t[i][:, k] * cf_cable_dir[i][2, k] <= tension_max)
+            eps = 1e-6
+            d = cf_cable_dir[i][:, k]
+            opti.subject_to(ca.sumsqr(d) >= 1.0 - eps)
+            opti.subject_to(ca.sumsqr(d) <= 1.0 + eps)
         opti.subject_to(cf_cable_t[i] >= tension_min)
         opti.subject_to(cf_cable_t[i] <= tension_max)
 
-    # Cable angle
-    h_min = 0.05  # keep cf above payload
-    tan2 = float(np.tan(np.deg2rad(theta_max))**2)
-
+    # Drones above payload
     for i in range(3):
         for k in range(M):
-            dx = cf_cable_dir[i][0, k]
-            dy = cf_cable_dir[i][1, k]
             dz = cf_cable_dir[i][2, k]
-            opti.subject_to(dz >= h_min / cable_l)
-            opti.subject_to(dx*dx + dy*dy <= tan2 * dz*dz)
+            opti.subject_to(dz >= 1e-3)
 
     # Dynamics
     def payload_f(x: ca.MX, sum_tension_vec: ca.MX) -> ca.MX:
@@ -157,10 +164,7 @@ def solve_ocp(
 
         # payload RK4 step with dt_k
         x_next = rk4_step(
-            xk,
-            fk=lambda xx: payload_f(xx, sum_tension),
-            dt_=dt_k
-        )
+            xk, fk=lambda xx: payload_f(xx, sum_tension), dt_=dt_k)
         opti.subject_to(pl_p[:, k + 1] == x_next[0:3])
         opti.subject_to(pl_v[:, k + 1] == x_next[3:6])
 
@@ -172,33 +176,41 @@ def solve_ocp(
     # ######### Cost function #########
     J = 0
 
-    # payload position/velocity tracking, acceleration minimization
+    # payload position tracking, jerk and snap energy minimization
     for k in range(M):
-        J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[k]))  # position tracking
+        J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[:, k]))  # position tracking
 
-    for k in range(M - 1):
-        dt_k = t_grid[k+1] - t_grid[k]
-        pl_v_ref = (pl_p_ref[k+1] - pl_p_ref[k]) / dt_k
-        J += w_pl_v * ca.sumsqr(pl_v[:, k] - pl_v_ref)  # velocity tracking
+        if k < M - 2:  # jerk
+            dt_k = t_grid[k+1] - t_grid[k]
+            pl_a = ca.vertcat(pl_v[:, k+1] - pl_v[:, k]) / dt_k
+            dt_k1 = t_grid[k+2] - t_grid[k+1]
+            pl_a_k1 = ca.vertcat(pl_v[:, k+2] - pl_v[:, k+1]) / dt_k1
+            dt_mid = 0.5*(dt_k + dt_k1)
+            j_k = (pl_a_k1 - pl_a) / dt_mid
+            J += w_pl_j * ca.sumsqr(j_k) * dt_mid  # jerk energy
 
-        pl_a = ca.vertcat(
-            pl_v[:, k+1] - pl_v[:, k]) / dt_k
-        J += w_pl_a * ca.sumsqr(pl_a) / dt_k  # acceleration energy
+            if k < M - 3:  # snap
+                dt_k2 = t_grid[k+3] - t_grid[k+2]
+                dt_mid2 = 0.5*(dt_k1 + dt_k2)
+                pl_a_k2 = ca.vertcat(pl_v[:, k+3] - pl_v[:, k+2]) / dt_k2
+                j_k1 = (pl_a_k2 - pl_a_k1) / dt_mid2
+                s_k = (j_k1 - j_k) / dt_mid2
+                J += w_pl_s * ca.sumsqr(s_k) * dt_mid2  # snap energy
 
     # payload terminal cost
-    J += w_pl_pT * ca.sumsqr(pl_p[:, M - 1] - ca.DM(pl_p_ref[-1]))
+    J += w_pl_pT * ca.sumsqr(pl_p[:, M - 1] - ca.DM(pl_p_ref[:, -1]))
     J += w_pl_vT * ca.sumsqr(pl_v[:, M - 1])
     pl_a_T = ca.vertcat(pl_v[:, M-1] - pl_v[:, M-2]) / (t_grid[M-1] - t_grid[M-2])
-    J += w_pl_aT * ca.sumsqr(pl_a_T)  # terminal acceleration energy
+    J += w_pl_aT * ca.sumsqr(pl_a_T)  # terminal acceleration
 
     # cf terminal cost
     for i in range(3):  # max z position
         J += -w_cf_pT * cf_p_it(i, M - 1)[2]
 
     # cf smoothness
-    for i in range(3):  
-        for k in range(M - 1):
-            J += w_cf_a * ca.sumsqr(cf_a[i][:, k])  # acceleration
+    for i in range(3):
+        # for k in range(M - 1):
+        #     J += w_cf_a * ca.sumsqr(cf_a[i][:, k])  # acceleration
 
         for k in range(M - 2):
             dt_k = t_grid[k+1] - t_grid[k]
@@ -217,23 +229,27 @@ def solve_ocp(
     for i in range(3):
         for k in range(M - 2):  # cable tension
             dt_k = t_grid[k + 1] - t_grid[k]
-            J += w_tension * ca.sumsqr(cf_cable_t[i][:, k]) * dt_k  # tension energy
+            # J += w_tension * ca.sumsqr(cf_cable_t[i][:, k]) * dt_k  # tension energy
 
-            dt_k = t_grid[k + 1] - t_grid[k]
             d_tension = cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]
             J += w_dtension * ca.sumsqr(d_tension) / dt_k  # tension change energy
 
-    # add final drone position cost
+    # minimize tension difference between drones
+    for k in range(M):
+        t1 = cf_cable_t[0][:, k]
+        t2 = cf_cable_t[1][:, k]
+        t3 = cf_cable_t[2][:, k]
+        J += w_tension * (ca.sumsqr(t1 - t2) + ca.sumsqr(t2 - t3) + ca.sumsqr(t3 - t1))
 
     opti.minimize(J)
 
     # ######### Initial guess #########
-    opti.set_initial(pl_p, pl_p_ref.T)
+    opti.set_initial(pl_p, pl_p_ref)
     opti.set_initial(pl_v, 0.0)
 
     base_dirs = np.zeros((3, 3))
     for i in range(3):
-        base_dirs[i] = (cf_p0[i] - pl_p_ref[0]) / cable_l
+        base_dirs[i] = (cf_p0[i] - pl_p_ref[:, 0]) / cable_l
         opti.set_initial(cf_cable_dir[i], np.tile(base_dirs[i].reshape(3, 1), (1, M)))
         opti.set_initial(cf_cable_t[i], 0.1)
 
@@ -264,7 +280,7 @@ def solve_ocp(
         "cf1_a": cf_a_sol[0], "cf2_a": cf_a_sol[1], "cf3_a": cf_a_sol[2],
         "cf1_cable_t": cf_cable_t_sol[0], "cf2_cable_t": cf_cable_t_sol[1], "cf3_cable_t": cf_cable_t_sol[2],
         "cf1_cable_dir": cf_cable_dir_sol[0], "cf2_cable_dir": cf_cable_dir_sol[1], "cf3_cable_dir": cf_cable_dir_sol[2],
-        "pl_p_ref": pl_p_ref.T,
+        "pl_p_ref": pl_p_ref,
         "cable_l": cable_l,
         "cf_radius": cf_radius,
     }
@@ -283,28 +299,29 @@ def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
 
     cf_height = 1.0  # solve at ~1m height
     cable_l = 0.5  # cable lengths
-    alpha = np.pi / 4.0  # initial rope angle
+    alpha = np.deg2rad(30.0)  # initial rope angle
     gamma = 2.0 * np.pi / 3.0  # initial drone separation angle
     pl_height = cf_height - cable_l * np.cos(alpha)
 
-    N = 20  # number of trajectory points per loop
+    N = 10  # number of trajectory points for one loop
     grid = np.linspace(0, 1, N + 1)  # points for traj
 
     if traj == 'ellipse':
         pl_waypoints = cf_waypoints.generate_ellipse(r_A=0.6, r_B=0.3, height=pl_height, grid=grid)
     elif traj == 'figure8':
-        pl_waypoints = cf_waypoints.generate_figure8(r_A=0.6, r_B=0.3, height=pl_height, grid=grid)
+        pl_waypoints = cf_waypoints.generate_figure8(r_A=0.6, r_B=0.6, height=pl_height, grid=grid)
     elif traj == 'random':
         start = np.array([0, 0, pl_height])
         step_size = 0.5
         pl_waypoints = cf_waypoints.generate_random_walk(start=start, step_size=step_size, grid=grid)
-    else:  # straight line
+    elif traj == 'line':  # straight line
         start = np.array([0, 0, pl_height])
-        goal = np.array([1, 0, pl_height])
+        goal = np.array([10, 0, 2*pl_height])
         pl_waypoints = cf_waypoints.generate_line(start=start, end=goal, grid=grid)
+    else:
+        raise ValueError(f"Unknown traj type: {traj}")
 
-    if loops > 1:
-        # extend trajectory for infinite flight
+    if loops > 1 and traj != 'line':
         p0 = pl_waypoints.copy()  # one loop, length N+1
         pl_waypoints = np.concatenate([p0[:-1] for _ in range(loops - 1)] + [p0], axis=0)
 
@@ -322,19 +339,17 @@ def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
         cable_l=cable_l,
         ros=ros,
     )
-    print("Solved. Payload at:", sol["pl_p"][:, -1])
 
     if save_csv:
         print("Saving trajectories...")
-        data_path = Path.home() / ".ros/crazyflo_planner" / "data"
+        data_path = ROOT_FOLDER / "data"
         data_path.mkdir(parents=True, exist_ok=True)
 
         cf_name = ["cf1", "cf2", "cf3"]
         for cf in cf_name:
             segs = poly7.fit_poly7_piecewise(
                 p=sol[f"{cf}_p"],
-                t_grid=sol["t"],
-            )
+                t_grid=sol["t"])
             out = data_path / f"traj_{cf}.csv"
             poly7.write_multi_csv(out, segs)
             print(f"Wrote {out} with {len(segs)} segments")
@@ -347,6 +362,6 @@ def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
 
 
 if __name__ == "__main__":
-    get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False)
+    get_traj()
     import matplotlib.pyplot as plt
     plt.show()

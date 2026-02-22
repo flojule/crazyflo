@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Optional, Sequence, Tuple, List, Iterable, Dict
+from typing import Optional, Tuple, List, Iterable, Dict
 import csv
 from dataclasses import dataclass
 
@@ -10,6 +10,7 @@ class Poly7Segment:
     coeffs_y: np.ndarray
     coeffs_z: np.ndarray
     coeffs_yaw: np.ndarray
+
 
 def _poly7_from_endpoint_conditions(
     dt: float,
@@ -163,10 +164,8 @@ def fit_poly7_piecewise(
     a_max: float = 10.0,
     j_max: float = 50.0,
     t_grid: Optional[np.ndarray] = None,
-    yaw_waypoints: Optional[np.ndarray] = None,
     max_iter: int = 50,
     samples_per_seg: int = 200,
-    time_scale_step: float = 1.15,
     max_seg_T: float = 20.0,
     min_seg_T: float = 1e-3,
 ) -> List[Poly7Segment]:
@@ -187,16 +186,8 @@ def fit_poly7_piecewise(
     """
     P = np.asarray(p, dtype=float).reshape(-1, 3)
     N = P.shape[0]
-    if N < 2:
-        raise ValueError("Need at least 2 waypoints.")
 
-    # yaw handling
-    if yaw_waypoints is None:
-        yaw = np.zeros(N, dtype=float)
-    else:
-        yaw = np.asarray(yaw_waypoints, dtype=float).reshape(-1)
-        if yaw.size != N:
-            raise ValueError("yaw_waypoints must have same length as pl_waypoints")
+    yaw = np.zeros(N, dtype=float)
 
     # time handling
     if t_grid is None:
@@ -217,17 +208,27 @@ def fit_poly7_piecewise(
     Ay = np.zeros(N, float)
     Jy = np.zeros(N, float)
 
-    # if t_grid is not None:
     for axis in range(3):
         v, a, j = _finite_derivatives(t_wp, P[:, axis])
         V[:, axis], A[:, axis], J[:, axis] = v, a, j
     Vy, Ay, Jy = _finite_derivatives(t_wp, yaw)
 
     # enforce boundary derivatives = 0 as required
-    V[0] = 0.0; A[0] = 0.0; J[0] = 0.0
-    V[-1] = 0.0; A[-1] = 0.0; J[-1] = 0.0
-    Vy[0] = 0.0; Ay[0] = 0.0; Jy[0] = 0.0
-    Vy[-1] = 0.0; Ay[-1] = 0.0; Jy[-1] = 0.0
+    V[0] = 0.0
+    A[0] = 0.0
+    J[0] = 0.0
+
+    V[-1] = 0.0
+    A[-1] = 0.0
+    J[-1] = 0.0
+
+    Vy[0] = 0.0
+    Ay[0] = 0.0
+    Jy[0] = 0.0
+
+    Vy[-1] = 0.0
+    Ay[-1] = 0.0
+    Jy[-1] = 0.0
 
     def build_segments(seg_T_local: np.ndarray) -> List[Poly7Segment]:
         segs: List[Poly7Segment] = []
@@ -310,7 +311,6 @@ def fit_poly7_piecewise(
 def sample_segments(
     segments: Iterable,
     dt: float,
-    *,
     include_endpoint: bool = True,
 ) -> Dict[str, np.ndarray]:
     """
@@ -325,12 +325,6 @@ def sample_segments(
       j:   (M,3)
     """
     segments = list(segments)
-    if not segments:
-        raise ValueError("segments is empty")
-
-    dt = float(dt)
-    if dt <= 0:
-        raise ValueError("dt must be > 0")
 
     t_all = []
     p_all = []
@@ -343,17 +337,25 @@ def sample_segments(
     for i, seg in enumerate(segments):
         T = float(seg.duration)
 
-        # local time grid for this segment
         if include_endpoint:
-            # include end on last segment; otherwise avoid duplicates
             last = (i == len(segments) - 1)
-            t_local = np.arange(0.0, T + (0.5 * dt), dt)
+
+            n = int(np.ceil(T / dt))
+            t_local = dt * np.arange(n + 1)
+            t_local = np.clip(t_local, 0.0, T)
+
             if not last:
-                # drop the endpoint to avoid duplicate time at next segment start
-                if t_local.size and np.isclose(t_local[-1], T):
-                    t_local = t_local[:-1]
+                t_local = t_local[t_local < T]
+
+            if last:
+                if t_local.size == 0 or not np.isclose(t_local[-1], T):
+                    t_local = np.concatenate([t_local, [T]])
+                else:
+                    t_local[-1] = T
         else:
-            t_local = np.arange(0.0, T, dt)
+            n = int(np.floor(T / dt))
+            t_local = dt * np.arange(n + 1)
+            t_local = t_local[t_local < T]
 
         t_global = t0_global + t_local
 
@@ -402,33 +404,92 @@ def sample_segments(
     }
 
 
-def get_waypoint_positions(segments):
-    """Return positions at segment boundaries."""
-    pts = []
+def get_waypoint_states(segments):
+    """
+    Return states at segment boundaries (start + each segment end).
 
-    # first point = start of first segment
+    Outputs dict with:
+      t     (N,)
+      pos   (N,3)
+      vel   (N,3)
+      acc   (N,3)
+      jerk  (N,3)
+      snap  (N,3)
+    """
+    def eval_poly(c, t):
+        return sum(c[n] * (t ** n) for n in range(c.size))
+
+    def eval_d1(c, t):
+        return sum(n * c[n] * (t ** (n - 1)) for n in range(1, c.size))
+
+    def eval_d2(c, t):
+        return sum(n * (n - 1) * c[n] * (t ** (n - 2)) for n in range(2, c.size))
+
+    def eval_d3(c, t):
+        return sum(n * (n - 1) * (n - 2) * c[n] * (t ** (n - 3)) for n in range(3, c.size))
+
+    def eval_d4(c, t):
+        return sum(n * (n - 1) * (n - 2) * (n - 3) * c[n] * (t ** (n - 4)) for n in range(4, c.size))
+
+    segments = list(segments)
+
+    pos, vel, acc, jerk, snap = [], [], [], [], []
+    times = [0.0]
+
     first = segments[0]
-    p0 = np.array([
-        first.coeffs_x[0],
-        first.coeffs_y[0],
-        first.coeffs_z[0],
-    ])
-    pts.append(p0)
+    t0 = 0.0
 
+    p0 = np.array([eval_poly(first.coeffs_x, t0),
+                   eval_poly(first.coeffs_y, t0),
+                   eval_poly(first.coeffs_z, t0)], dtype=float)
+    v0 = np.array([eval_d1(first.coeffs_x, t0),
+                   eval_d1(first.coeffs_y, t0),
+                   eval_d1(first.coeffs_z, t0)], dtype=float)
+    a0 = np.array([eval_d2(first.coeffs_x, t0),
+                   eval_d2(first.coeffs_y, t0),
+                   eval_d2(first.coeffs_z, t0)], dtype=float)
+    j0 = np.array([eval_d3(first.coeffs_x, t0),
+                   eval_d3(first.coeffs_y, t0),
+                   eval_d3(first.coeffs_z, t0)], dtype=float)
+    s0 = np.array([eval_d4(first.coeffs_x, t0),
+                   eval_d4(first.coeffs_y, t0),
+                   eval_d4(first.coeffs_z, t0)], dtype=float)
+
+    pos.append(p0); vel.append(v0); acc.append(a0); jerk.append(j0); snap.append(s0)
+
+    # cumulative time and segment ends
+    t_cum = 0.0
     for seg in segments:
-        T = seg.duration
-        # evaluate end position
-        def eval_poly(c, t):
-            return sum(c[n] * t**n for n in range(len(c)))
+        T = float(seg.duration)
+        t_cum += T
+        times.append(t_cum)
 
-        p_end = np.array([
-            eval_poly(seg.coeffs_x, T),
-            eval_poly(seg.coeffs_y, T),
-            eval_poly(seg.coeffs_z, T),
-        ])
-        pts.append(p_end)
+        p = np.array([eval_poly(seg.coeffs_x, T),
+                      eval_poly(seg.coeffs_y, T),
+                      eval_poly(seg.coeffs_z, T)], dtype=float)
+        v = np.array([eval_d1(seg.coeffs_x, T),
+                      eval_d1(seg.coeffs_y, T),
+                      eval_d1(seg.coeffs_z, T)], dtype=float)
+        a = np.array([eval_d2(seg.coeffs_x, T),
+                      eval_d2(seg.coeffs_y, T),
+                      eval_d2(seg.coeffs_z, T)], dtype=float)
+        j = np.array([eval_d3(seg.coeffs_x, T),
+                      eval_d3(seg.coeffs_y, T),
+                      eval_d3(seg.coeffs_z, T)], dtype=float)
+        s = np.array([eval_d4(seg.coeffs_x, T),
+                      eval_d4(seg.coeffs_y, T),
+                      eval_d4(seg.coeffs_z, T)], dtype=float)
 
-    return np.vstack(pts)
+        pos.append(p); vel.append(v); acc.append(a); jerk.append(j); snap.append(s)
+
+    return {
+        "t": np.array(times, dtype=float),
+        "p": np.vstack(pos),
+        "v": np.vstack(vel),
+        "a": np.vstack(acc),
+        "j": np.vstack(jerk),
+        "s": np.vstack(snap),
+    }
 
 
 def get_time_grid(segments):
@@ -444,11 +505,11 @@ def get_time_grid(segments):
 def write_multi_csv(path: str, segments: list[Poly7Segment]) -> None:
     """
     Write trajectory to a csv file in uav_trajectory/crazyflie format:
-      dt  x0..x7  y0..y7  z0..z7  yaw0..yaw7
+      Duration x0..x7  y0..y7  z0..z7  yaw0..yaw7
     """
     with open(path, "w", encoding="utf-8") as f:
         writer = csv.writer(f)
-        header = ["duration"]
+        header = ["Duration"]
         header += [f"x^{n}" for n in range(8)]
         header += [f"y^{n}" for n in range(8)]
         header += [f"z^{n}" for n in range(8)]
