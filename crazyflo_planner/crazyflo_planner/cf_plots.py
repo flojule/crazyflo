@@ -11,16 +11,6 @@ PLOT_OCP = True
 PLOT_BAG = False
 OFFSET_BAG = 0.0  # offset in seconds to align with ocp solution
 
-
-# Load OCP data
-ocp_path = ROOT_FOLDER / "data" / "ocp_solution.npz"
-ocp_data = np.load(ocp_path)
-
-# Load rosbag data
-bag_path = Path.home() / "winter-project/ws/bag"
-bag_path = bag_path / "rosbag2_2026_02_06-17_56_10"
-bag_data = cf_data.get_bag_data(bag_path)
-
 # Create figures and axes
 f_states, a_states = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
 if PLOT_OCP:
@@ -61,7 +51,8 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-'):
 
     for ax in a_states.flatten():
         ax.grid(True)
-        ax.legend()
+        if len(ax.get_lines()) > 0:
+            ax.legend()
 
     f_states.tight_layout()
 
@@ -88,7 +79,8 @@ def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-'):
 
     for ax in a_states.flatten():
         ax.grid(True)
-        ax.legend()
+        if len(ax.get_lines()) > 0:
+            ax.legend()
 
     f_states.tight_layout()
 
@@ -518,8 +510,23 @@ def animate_ocp(ocp_data: dict, time=False):
 
 if __name__ == "__main__":
 
+    # Load OCP data
+    ocp_path = ROOT_FOLDER / "data" / "ocp_solution.npz"
+    ocp_data = np.load(ocp_path)
+
+    # Load rosbag data
+    bag_path = Path.home() / "winter-project/ws/bag"
+    bag_path = bag_path / "rosbag2_2026_02_06-17_56_10"
+    bag_data = cf_data.get_bag_data(bag_path)
+
     cable_l = ocp_data["cable_l"]
     t_total = ocp_data["t"][-1] - ocp_data["t"][0]
+
+    line_break = "-" * 50
+
+    print(f"\n{line_break}")
+    print(f"Loading data from {ocp_path}")
+    print(f"{line_break}\n")
 
     if PLOT_OCP:
         plot_ocp(ocp_data)
@@ -537,4 +544,8 @@ if __name__ == "__main__":
         f_constr.savefig(figures_path / "cf_constraints.png")
     f_3d.savefig(figures_path / "cf_3d.png")
 
-    plt.show()
+    print(f"\n{line_break}")
+    print("Plots saved to:", figures_path)
+    print(f"{line_break}\n")
+
+    # plt.show()

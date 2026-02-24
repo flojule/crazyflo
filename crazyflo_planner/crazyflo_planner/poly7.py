@@ -522,3 +522,25 @@ def write_multi_csv(path: str, segments: list[Poly7Segment]) -> None:
             row += seg.coeffs_z.tolist()
             row += seg.coeffs_yaw.tolist()
             writer.writerow(row)
+
+
+def show_min_max_coeffs(segments: list[Poly7Segment]) -> None:
+    """
+    Print min/max of each coefficient across all segments for debugging.
+    """
+    coeffs_x = np.array([seg.coeffs_x for seg in segments])
+    coeffs_y = np.array([seg.coeffs_y for seg in segments])
+    coeffs_z = np.array([seg.coeffs_z for seg in segments])
+    coeffs_yaw = np.array([seg.coeffs_yaw for seg in segments])
+
+    print("Coefficient ranges across segments:")
+    for n in range(8):
+        x_min, x_max = coeffs_x[:, n].min(), coeffs_x[:, n].max()
+        y_min, y_max = coeffs_y[:, n].min(), coeffs_y[:, n].max()
+        z_min, z_max = coeffs_z[:, n].min(), coeffs_z[:, n].max()
+        yaw_min, yaw_max = coeffs_yaw[:, n].min(), coeffs_yaw[:, n].max()
+        print(f"  x^{n}: [{x_min:.3e}, {x_max:.3e}]")
+        print(f"  y^{n}: [{y_min:.3e}, {y_max:.3e}]")
+        print(f"  z^{n}: [{z_min:.3e}, {z_max:.3e}]")
+        print(f"  yaw^{n}: [{yaw_min:.3e}, {yaw_max:.3e}]")
+

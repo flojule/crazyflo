@@ -348,9 +348,26 @@ def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
 
         cf_name = ["cf1", "cf2", "cf3"]
         for cf in cf_name:
+
+            print(f"\nStarting trajectory for {cf}:")
+            for k in range(1):
+                print(f' x = {sol[f"{cf}_p"][:, k]}')
+                print(f' v = {sol[f"{cf}_v"][:, k]}')
+                print(f' a = {sol[f"{cf}_a"][:, k]}')
+
+            # print max velocity and acceleration
+            v_max = np.max(np.linalg.norm(sol[f"{cf}_v"], axis=0))
+            a_max = np.max(np.linalg.norm(sol[f"{cf}_a"], axis=0))
+            print(f" max velocity: {v_max:.2f} m/s")
+            print(f" max acceleration: {a_max:.2f} m/s²")
+
+            p = sol[f"{cf}_p"]
+            print(f'dimensions: {p.shape}')
             segs = poly7.fit_poly7_piecewise(
-                p=sol[f"{cf}_p"],
+                p=sol[f"{cf}_p"].T,
                 t_grid=sol["t"])
+            # poly7.show_min_max_coeffs(segs)
+
             out = data_path / f"traj_{cf}.csv"
             poly7.write_multi_csv(out, segs)
             print(f"Wrote {out} with {len(segs)} segments")
@@ -366,3 +383,5 @@ if __name__ == "__main__":
     get_traj()
     import matplotlib.pyplot as plt
     plt.show()
+
+
