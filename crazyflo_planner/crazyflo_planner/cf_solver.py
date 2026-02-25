@@ -4,16 +4,11 @@
 """
 
 import numpy as np
-from pathlib import Path
-
 import casadi as ca
-
-ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
 
 
 def solve_ocp(
-    pl_waypoints: np.ndarray,  # payload reference trajectory
-    cf_p0: list[np.ndarray],  # initial drone positions
+    pl_traj: dict,  # payload reference trajectory with time grid and reference points
     cable_l: float,  # cable length
     pl_mass: float = 0.03,  # payload mass in kg
     g: float = 9.81,  # gravity acceleration
@@ -39,25 +34,15 @@ def solve_ocp(
     w_pl_vT: float = 0.001,  # terminal velocity weight
     w_pl_aT: float = 0.001,  # terminal acceleration weight
     w_cf_pT: float = 0.001,  # terminal position weight
-    ros: bool = False,
 ) -> dict:
     """Solve the 3-drone payload OCP."""
-    if ros:
-        from . import poly7
-    else:
-        import poly7
 
-    pl_scale = 1.0  # scale max payload velocity/acceleration
-    segments = poly7.fit_poly7_piecewise(
-        pl_waypoints, cf_v_max*pl_scale, cf_a_max*pl_scale, cf_j_max*pl_scale)
+    cf_p0 = get_drones_p0(cable_l, pl_traj["p"][2, 0])
 
-    states = poly7.get_waypoint_states(segments)
-
-    t_grid = states["t"]
+    t_grid = pl_traj["t"]
     print(f"min seg dt: {np.min(np.diff(t_grid)):.4f}")
     print(f"max seg dt: {np.max(np.diff(t_grid)):.4f}")
-    pl_p_ref = states["p"].T
-    pl_v_ref = states["v"].T
+    pl_p_ref = pl_traj["p"].T
 
     M = pl_p_ref.shape[1]  # number of reference points
 
@@ -287,101 +272,52 @@ def solve_ocp(
     }
 
 
-def get_traj(traj='ellipse', loops=5, plot=True, save_csv=True, ros=False):
-    """Solve an example OCP and export trajectories."""
-    if ros:
-        from . import cf_plots
-        from . import poly7
-        from . import cf_waypoints
-    else:
-        import cf_plots
-        import poly7
-        import cf_waypoints
-
-    cf_height = 1.0  # solve at ~1m height
-    cable_l = 0.5  # cable lengths
+def get_drones_p0(cable_l, pl_height):
+    # drones initial positions
     alpha = np.deg2rad(30.0)  # initial rope angle
+    cf_height = pl_height + cable_l * np.cos(alpha)
     gamma = 2.0 * np.pi / 3.0  # initial drone separation angle
-    pl_height = cf_height - cable_l * np.cos(alpha)
-
-    N = 20  # number of trajectory points for one loop
-    grid = np.linspace(0, 1, N + 1)  # points for traj
-
-    if traj == 'ellipse':
-        pl_waypoints = cf_waypoints.generate_ellipse(r_A=0.6, r_B=0.3, height=pl_height, grid=grid)
-    elif traj == 'figure8':
-        pl_waypoints = cf_waypoints.generate_figure8(r_A=0.6, r_B=0.6, height=pl_height, grid=grid)
-    elif traj == 'random':
-        start = np.array([0, 0, pl_height])
-        step_size = 0.5
-        pl_waypoints = cf_waypoints.generate_random_walk(start=start, step_size=step_size, grid=grid)
-    elif traj == 'line':  # straight line
-        start = np.array([0, 0, pl_height])
-        goal = np.array([10, 0, 2*pl_height])
-        pl_waypoints = cf_waypoints.generate_line(start=start, end=goal, grid=grid)
-    else:
-        raise ValueError(f"Unknown traj type: {traj}")
-
-    if loops > 1 and traj != 'line':
-        p0 = pl_waypoints.copy()  # one loop, length N+1
-        pl_waypoints = np.concatenate([p0[:-1] for _ in range(loops - 1)] + [p0], axis=0)
-
-    # drone initial positions
     cf_R = cable_l * np.cos(alpha)  # radius of drone formation
     cf_p0 = [
         np.array([cf_R * np.cos(0), cf_R * np.sin(0), cf_height]),
         np.array([cf_R * np.cos(gamma), cf_R * np.sin(gamma), cf_height]),
         np.array([cf_R * np.cos(2 * gamma), cf_R * np.sin(2 * gamma), cf_height]),
     ]
-
-    sol = solve_ocp(
-        pl_waypoints=pl_waypoints,
-        cf_p0=cf_p0,
-        cable_l=cable_l,
-        ros=ros,
-    )
-
-    if save_csv:
-        print("Saving trajectories...")
-        data_path = ROOT_FOLDER / "data"
-        data_path.mkdir(parents=True, exist_ok=True)
-
-        cf_name = ["cf1", "cf2", "cf3"]
-        for cf in cf_name:
-
-            print(f"\nStarting trajectory for {cf}:")
-            for k in range(1):
-                print(f' x = {sol[f"{cf}_p"][:, k]}')
-                print(f' v = {sol[f"{cf}_v"][:, k]}')
-                print(f' a = {sol[f"{cf}_a"][:, k]}')
-
-            # print max velocity and acceleration
-            v_max = np.max(np.linalg.norm(sol[f"{cf}_v"], axis=0))
-            a_max = np.max(np.linalg.norm(sol[f"{cf}_a"], axis=0))
-            print(f" max velocity: {v_max:.2f} m/s")
-            print(f" max acceleration: {a_max:.2f} m/s²")
-
-            p = sol[f"{cf}_p"]
-            print(f'dimensions: {p.shape}')
-            segs = poly7.fit_poly7_piecewise(
-                p=sol[f"{cf}_p"].T,
-                t_grid=sol["t"])
-            # poly7.show_min_max_coeffs(segs)
-
-            out = data_path / f"traj_{cf}.csv"
-            poly7.write_multi_csv(out, segs)
-            print(f"Wrote {out} with {len(segs)} segments")
-
-        np.savez(data_path / "ocp_solution.npz", **{k: v for k, v in sol.items()})
-
-    if plot:
-        cf_plots.plot_ocp(sol)
-        cf_plots.animate_ocp(sol, time=True)
+    return cf_p0
 
 
-if __name__ == "__main__":
-    get_traj()
-    import matplotlib.pyplot as plt
-    plt.show()
+def save_ocp(sol, filename="ocp_solution.npz", path="."):
+    """Save OCP solution trajectories to npz file."""
+    np.savez(path / filename, **{k: v for k, v in sol.items()})
+    print(f"OCP solution saved to {path / filename}")
 
 
+def print_ocp_stats(sol):
+    print()
+    print("-" * 30)
+    print("Solution stats:")
+    t_grid = sol["t"]
+    print(f"min seg dt: {np.min(np.diff(t_grid)):.4f}")
+    print(f"max seg dt: {np.max(np.diff(t_grid)):.4f}")
+    print(f"trajectory duration: {t_grid[-1]:.2f} s\n")
+
+    cf_name = ["cf1", "cf2", "cf3"]
+    for cf in cf_name:
+
+        print(f"\nStarting trajectory for {cf}:")
+        for k in range(1):
+            print(f' x = {sol[f"{cf}_p"][:, k]}')
+            print(f' v = {sol[f"{cf}_v"][:, k]}')
+            print(f' a = {sol[f"{cf}_a"][:, k]}')
+
+        # print max velocity and acceleration
+        v_max = np.max(np.linalg.norm(sol[f"{cf}_v"], axis=0))
+        a_max = np.max(np.linalg.norm(sol[f"{cf}_a"], axis=0))
+        print(f" max velocity: {v_max:.2f} m/s")
+        print(f" max acceleration: {a_max:.2f} m/s²")
+
+        p = sol[f"{cf}_p"]
+        print(f'dimensions: {p.shape}')
+
+    print("-" * 30)
+    print()

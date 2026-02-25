@@ -411,29 +411,13 @@ def get_waypoint_states(segments):
     Outputs dict with:
       t     (N,)
       pos   (N,3)
-      vel   (N,3)
-      acc   (N,3)
-      jerk  (N,3)
-      snap  (N,3)
     """
     def eval_poly(c, t):
         return sum(c[n] * (t ** n) for n in range(c.size))
 
-    def eval_d1(c, t):
-        return sum(n * c[n] * (t ** (n - 1)) for n in range(1, c.size))
-
-    def eval_d2(c, t):
-        return sum(n * (n - 1) * c[n] * (t ** (n - 2)) for n in range(2, c.size))
-
-    def eval_d3(c, t):
-        return sum(n * (n - 1) * (n - 2) * c[n] * (t ** (n - 3)) for n in range(3, c.size))
-
-    def eval_d4(c, t):
-        return sum(n * (n - 1) * (n - 2) * (n - 3) * c[n] * (t ** (n - 4)) for n in range(4, c.size))
-
     segments = list(segments)
 
-    pos, vel, acc, jerk, snap = [], [], [], [], []
+    pos = []
     times = [0.0]
 
     first = segments[0]
@@ -442,20 +426,8 @@ def get_waypoint_states(segments):
     p0 = np.array([eval_poly(first.coeffs_x, t0),
                    eval_poly(first.coeffs_y, t0),
                    eval_poly(first.coeffs_z, t0)], dtype=float)
-    v0 = np.array([eval_d1(first.coeffs_x, t0),
-                   eval_d1(first.coeffs_y, t0),
-                   eval_d1(first.coeffs_z, t0)], dtype=float)
-    a0 = np.array([eval_d2(first.coeffs_x, t0),
-                   eval_d2(first.coeffs_y, t0),
-                   eval_d2(first.coeffs_z, t0)], dtype=float)
-    j0 = np.array([eval_d3(first.coeffs_x, t0),
-                   eval_d3(first.coeffs_y, t0),
-                   eval_d3(first.coeffs_z, t0)], dtype=float)
-    s0 = np.array([eval_d4(first.coeffs_x, t0),
-                   eval_d4(first.coeffs_y, t0),
-                   eval_d4(first.coeffs_z, t0)], dtype=float)
 
-    pos.append(p0); vel.append(v0); acc.append(a0); jerk.append(j0); snap.append(s0)
+    pos.append(p0)
 
     # cumulative time and segment ends
     t_cum = 0.0
@@ -467,28 +439,12 @@ def get_waypoint_states(segments):
         p = np.array([eval_poly(seg.coeffs_x, T),
                       eval_poly(seg.coeffs_y, T),
                       eval_poly(seg.coeffs_z, T)], dtype=float)
-        v = np.array([eval_d1(seg.coeffs_x, T),
-                      eval_d1(seg.coeffs_y, T),
-                      eval_d1(seg.coeffs_z, T)], dtype=float)
-        a = np.array([eval_d2(seg.coeffs_x, T),
-                      eval_d2(seg.coeffs_y, T),
-                      eval_d2(seg.coeffs_z, T)], dtype=float)
-        j = np.array([eval_d3(seg.coeffs_x, T),
-                      eval_d3(seg.coeffs_y, T),
-                      eval_d3(seg.coeffs_z, T)], dtype=float)
-        s = np.array([eval_d4(seg.coeffs_x, T),
-                      eval_d4(seg.coeffs_y, T),
-                      eval_d4(seg.coeffs_z, T)], dtype=float)
 
-        pos.append(p); vel.append(v); acc.append(a); jerk.append(j); snap.append(s)
+        pos.append(p)
 
     return {
         "t": np.array(times, dtype=float),
         "p": np.vstack(pos),
-        "v": np.vstack(vel),
-        "a": np.vstack(acc),
-        "j": np.vstack(jerk),
-        "s": np.vstack(snap),
     }
 
 

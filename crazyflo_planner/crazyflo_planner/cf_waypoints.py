@@ -42,3 +42,37 @@ def generate_random_walk(start, step_size, grid):
         waypoints.append(waypoints[-1] + step)
     return np.stack(waypoints, axis=0)
 
+
+def generate_waypoints(traj='ellipse', height=0.5, loops=5, N=20, folder=''):
+    grid = np.linspace(0, 1, N + 1)  # points for traj
+
+    if traj == 'ellipse':
+        waypoints = generate_ellipse(
+            r_A=0.6, r_B=0.3, height=height, grid=grid)
+    elif traj == 'figure8':
+        waypoints = generate_figure8(
+            r_A=0.6, r_B=0.6, height=height, grid=grid)
+    elif traj == 'random':
+        start = np.array([0, 0, height])
+        step_size = 0.5
+        waypoints = generate_random_walk(
+            start=start, step_size=step_size, grid=grid)
+    elif traj == 'line':  # straight line
+        start = np.array([0, 0, height])
+        goal = np.array([2, 0, height])
+        waypoints = generate_line(
+            start=start, end=goal, grid=grid)
+    else:
+        raise ValueError(f"Unknown traj type: {traj}")
+
+    if loops > 1 and traj != 'line' and traj != 'random':
+        p0 = waypoints.copy()  # one loop, length N+1
+        waypoints = np.concatenate(
+            [p0[:-1] for _ in range(loops - 1)] + [p0], axis=0)
+
+    # save pl_waypoints to csv
+    out = folder / "pl_waypoints.csv"
+    np.savetxt(out, waypoints, delimiter=",")
+    print(f"Wrote {out} with {len(waypoints)} waypoints.")
+
+    return waypoints

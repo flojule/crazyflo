@@ -52,7 +52,6 @@ setup(
         'console_scripts': [
             'payload_sim = crazyflo_planner.payload_sim:main',
             'mission = crazyflo_planner.mission:main',
-            'figure8 = crazyflo_planner.figure8:main',
         ],
         
     },

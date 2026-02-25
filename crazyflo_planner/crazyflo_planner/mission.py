@@ -5,9 +5,6 @@ from pathlib import Path
 from crazyflie_py import Crazyswarm
 from crazyflie_py.uav_trajectory import Trajectory
 
-from crazyflo_planner.cf_solver import get_traj
-
-TRIALS = 1
 TIMESCALE = 1.0
 
 BUFFER_TIME = 2.0
@@ -17,8 +14,8 @@ INITIAL_HEIGHT = 0.4
 
 LANDING_TIME = 2.0
 
-# ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
-ROOT_FOLDER = Path.home() / "winter-project/ws/src/crazyflo/crazyflo_planner"
+ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
+# ROOT_FOLDER = Path.home() / "winter-project/ws/src/crazyflo/crazyflo_planner"
 # ROOT_FOLDER = Path.home() / "winter-project/ws/src/crazyflo/crazyflo_planner/data/multi_trajectory"
 
 data_path = ROOT_FOLDER / "data"
