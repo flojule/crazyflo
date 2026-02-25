@@ -8,8 +8,6 @@ import cf_data
 
 ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
 PLOT_OCP = True
-PLOT_BAG = False
-OFFSET_BAG = 0.0  # offset in seconds to align with ocp solution
 
 # Create figures and axes
 f_states, a_states = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
@@ -510,13 +508,17 @@ def animate_ocp(ocp_data: dict, time=False):
 
 if __name__ == "__main__":
 
+    PLOT_BAG = True
+    OFFSET_BAG = 0.0  # offset in seconds to align with ocp solution
+
     # Load OCP data
     ocp_path = ROOT_FOLDER / "data" / "ocp_solution.npz"
     ocp_data = np.load(ocp_path)
 
     # Load rosbag data
-    bag_path = Path.home() / "winter-project/ws/bag"
-    bag_path = bag_path / "rosbag2_2026_02_06-17_56_10"
+    bag_name = "rosbag2_2026_02_24-17_33_56"  #  rosbag2_2026_02_24-17_30_27
+    bag_path = Path.home() / "winter-project/ws/"
+    bag_path = bag_path / bag_name
     bag_data = cf_data.get_bag_data(bag_path)
 
     cable_l = ocp_data["cable_l"]
@@ -530,7 +532,7 @@ if __name__ == "__main__":
 
     if PLOT_OCP:
         plot_ocp(ocp_data)
-        anim = animate_ocp(ocp_data)
+        # anim = animate_ocp(ocp_data)
         # anim.save(figures_path / "traj.gif", writer="pillow", fps=30)
 
     if PLOT_BAG:
@@ -548,4 +550,4 @@ if __name__ == "__main__":
     print("Plots saved to:", figures_path)
     print(f"{line_break}\n")
 
-    # plt.show()
+    plt.show()

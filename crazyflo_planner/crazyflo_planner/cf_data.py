@@ -24,6 +24,9 @@ def get_bag_data(bag_path):
     # Get topic types
     topic_types = reader.get_all_topics_and_types()
     type_map = {t.name: t.type for t in topic_types}
+    print("Topics in bag:")
+    for topic in type_map:
+        print(f"  {topic}: {type_map[topic]}")
 
     cf1_pose = "/cf1/pose"
     cf2_pose = "/cf2/pose"
@@ -71,7 +74,8 @@ def get_bag_data(bag_path):
             cf_p[j] = np.empty((3, 0))
             continue
         for i in range(len(bag_data_topics[pose])):
-            t_ = bag_data_topics[pose][i]["msg"]["header"]["stamp"]["sec"] + bag_data_topics[pose][i]["msg"]["header"]["stamp"]["nanosec"] * 1e-9
+            # t_ = bag_data_topics[pose][i]["msg"]["header"]["stamp"]["sec"] + bag_data_topics[pose][i]["msg"]["header"]["stamp"]["nanosec"] * 1e-9
+            t_ = bag_data_topics[pose][i]["time"] * 1e-9
             t[j].append(t_)
             cf_p[j].append(
                 [bag_data_topics[pose][i]["msg"]["pose"]["position"]["x"],
@@ -100,6 +104,9 @@ def get_bag_data(bag_path):
         # average dt
         dt = np.median(np.diff(t1))
         t_new = np.arange(0, t_end - t_start, dt)
+
+    print(f"Original time lengths: {len(t1)}, {len(t2)}, {len(t3)}")
+    print(f"New time length: {len(t_new)}")
 
     cf_p_new, cf_v_new, cf_a_new = [], [], []
     for j in range(3):

@@ -12,6 +12,10 @@ ros2 launch crazyflo_planner real.launch.xml
 ros2 run crazyflo_planner mission
 
 
+record
+ros2 bag record --topics /cf1/pose /cf2/pose /cf3/pose
+
+
 srv/
 crazyflie_interfaces/srv/AddLogging
 crazyflie_interfaces/srv/NotifySetpointsStop
@@ -55,8 +59,6 @@ gz sim -r worlds/crazyflie_world.sdf
 /crazyflie/gazebo/command/twist
 
 
-record
-ros2 bag record --topics /cf1/pose /cf2/pose /cf3/pose
 
 
 
