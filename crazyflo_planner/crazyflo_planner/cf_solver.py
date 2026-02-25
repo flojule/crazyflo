@@ -18,7 +18,7 @@ def solve_ocp(
     tension_min: float = 0.05,  # min tension in N
     tension_max: float = 0.15,  # max tension in N
     cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
-    w_pl_p: float = 10.0,  # position weight
+    w_pl_p: float = 100.0,  # position weight
     w_pl_v: float = 0.01,  # velocity weight
     w_pl_a: float = 0.001,  # acceleration weight
     w_pl_j: float = 0.0001,  # jerk weight
@@ -28,7 +28,7 @@ def solve_ocp(
     w_cf_a: float = 0.001,  # acceleration weight
     w_cf_j: float = 0.01,  # jerk weight
     w_cf_s: float = 0.01,  # snap weight
-    w_tension: float = 0.0001,  # tension weight
+    w_tension: float = 0.01,  # tension weight
     w_dtension: float = 0.0001,  # tension change weight
     w_pl_pT: float = 0.01,  # terminal position weight
     w_pl_vT: float = 0.001,  # terminal velocity weight

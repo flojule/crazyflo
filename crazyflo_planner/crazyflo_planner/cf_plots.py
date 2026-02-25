@@ -1,17 +1,15 @@
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
+from pathlib import Path
 
 COLORS = ['r', 'g', 'b']
 
 
-def plot_ocp(ocp_data: dict):
+def plot_ocp(ocp_data: dict, constraints=False, animate=False, folder=None):
     """Plot data from OCP solution dictionary."""
-    f_states, a_states = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
-    f_constr, a_constr = plt.subplots(2, 2, sharex=True, figsize=(16, 10))
-    f_3d = plt.figure(figsize=(12, 12))
-    a_3d = f_3d.add_subplot(projection="3d")
-
+    if not constraints:
+        f_constr = a_constr = None
     t = ocp_data["t"]
     pl_p = ocp_data["pl_p"]
     pl_v = ocp_data["pl_v"]
@@ -23,54 +21,95 @@ def plot_ocp(ocp_data: dict):
     cable_l = ocp_data["cable_l"]
     cf_radius = ocp_data["cf_radius"]
 
-    plot_states_cf(t, cf_p, cf_v, cf_a,
-                   fig=f_states, axes=a_states)
+    f_states, a_states = plot_states_cf(t, cf_p, cf_v, cf_a)
     plot_states_pl(t, pl_p, pl_v, pl_p_ref,
                    fig=f_states, axes=a_states)
-    plot_constraints(cf_p, pl_p, cf_cable_t, cable_l,
-                     fig=f_constr, axes=a_constr)
-    plot_3d(cf_p, pl_p, pl_p_ref, cf_radius,
-            fig=f_3d, axes=a_3d)
+    if constraints:
+        f_constr, a_constr = plot_constraints(cf_p, pl_p, cf_cable_t, cable_l)
+    f_3d, a_3d = plot_3d(cf_p, pl_p, pl_p_ref, cf_radius)
 
     set_3d_axis(fig=f_3d, axes=a_3d)
+
+    if animate:
+        animate_ocp(ocp_data)
+    if folder is not None:
+        save_plots(f_states, f_constr, f_3d, folder)
+
     return f_states, a_states, f_constr, a_constr, f_3d, a_3d
+
+
+def plot_xyz(data, t_offset=0.0, t_total=None, fig=None, axes=None):
+    """Plot x,y,z components of a trajectory."""
+    if fig is None or axes is None:
+        fig, axes = plt.subplots(3, 3, sharex=True, figsize=(20, 12))
+    y_labels = ["x", "y", "z"]
+    plot_labels = ["cf1", "cf2", "cf3"] if t_offset == 0.0 else ["cf1 (bag)", "cf2 (bag)", "cf3 (bag)"]
+    t = data["t"]
+    cf_p = np.stack([data["cf1_p"], data["cf2_p"], data["cf3_p"]])
+    if cf_p.shape == (3, 3, t.shape[0]):
+        pass  # already (cf, axis, time)
+    elif cf_p.shape == (3, t.shape[0], 3):
+        cf_p = cf_p.transpose(0, 2, 1)
+    for i in range(3):
+        for j in range(3):  # 3 drones
+            axes[i, j].plot(t - t_offset, cf_p[j, i, :],
+                         label=plot_labels[j], linewidth=1)
+            axes[i, j].set_ylabel(f"Position {y_labels[i]} [m]")
+            axes[i, j].grid(True)
+            axes[i, j].legend()
+            axes[2, j].set_xlabel("Time [s]")
+            if t_total is not None:
+                axes[2, j].set_xlim(0.0, t_total)
+    fig.tight_layout()
+    return fig, axes
+
+
+def save_plots(f_states, f_constr, f_3d, folder):
+    if f_states is not None:
+        f_states.savefig(folder / "cf_plot.png")
+    if f_constr is not None:
+        f_constr.savefig(folder / "cf_constraints.png")
+    if f_3d is not None:
+        f_3d.savefig(folder / "cf_3d.png")
+    print("Plots saved to:", folder)
 
 
 def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-',
                    fig=None, axes=None):
     """Plot drone states."""
     if fig is None or axes is None:
-        fig, axes = plt.subplots(4, 2, sharex=True, figsize=(12, 10))
-    axes[0, 0].set_ylabel("Altitude [m]")
-    axes[1, 0].set_ylabel("Speed [m/s]")
-    axes[2, 0].set_ylabel("Acceleration [m/s]")
-    axes[3, 0].set_ylabel("Jerk [m/s]")
-    axes[3, 0].set_xlabel("Time [s]")
+        fig, axes = plt.subplots(3, 1, sharex=True, figsize=(16, 14))
+    axes[0].set_ylabel("Altitude [m]")
+    axes[1].set_ylabel("Speed [m/s]")
+    axes[2].set_ylabel("Acceleration [m/s]")
+    # axes[3, 0].set_ylabel("Jerk [m/s]")
+    # axes[3, 0].set_xlabel("Time [s]")
+    axes[2].set_xlabel("Time [s]")
 
     for i in range(3):
         if len(cf_p[i, :, :]) == 0:
             continue
 
-        axes[0, 0].plot(
+        axes[0].plot(
             t, cf_p[i, 2, :], label=f"Drone {i+1}",
             color=COLORS[i], linestyle=linestyle, linewidth=1)
 
         if cf_v is not None:
             speeds = np.linalg.norm(cf_v[i, :, :], axis=0)
-            axes[1, 0].plot(
+            axes[1].plot(
                 t, speeds, label=f"Drone {i+1}",
                 color=COLORS[i], linestyle=linestyle, linewidth=1)
         if cf_a is not None:
             accels = np.linalg.norm(cf_a[i, :, :], axis=0)
-            axes[2, 0].plot(
+            axes[2].plot(
                 t[:-1], accels, label=f"Drone {i+1}",
                 color=COLORS[i], linestyle=linestyle, linewidth=1)
 
-            jerks = np.linalg.norm(
-                np.gradient(cf_a[i, :, :], t[:-1], axis=1), axis=0)
-            axes[3, 0].plot(
-                t[:-1], jerks, label=f"Drone {i+1}",
-                color=COLORS[i], linestyle=linestyle, linewidth=1)
+            # jerks = np.linalg.norm(
+            #     np.gradient(cf_a[i, :, :], t[:-1], axis=1), axis=0)
+            # axes[3, 0].plot(
+            #     t[:-1], jerks, label=f"Drone {i+1}",
+            #     color=COLORS[i], linestyle=linestyle, linewidth=1)
 
     for ax in axes.flatten():
         ax.grid(True)
@@ -78,13 +117,14 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-',
             ax.legend()
 
     fig.tight_layout()
+    return fig, axes
 
 
 def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-', fig=None, axes=None):
     """Plot payload states."""
     if fig is None or axes is None:
-        fig, axes = plt.subplots(4, 2, sharex=True, figsize=(12, 10))
-    axes[0, 0].plot(
+        fig, axes = plt.subplots(3, 1, sharex=True, figsize=(16, 14))
+    axes[0].plot(
         t, pl_p[2, :], label="payload",
         color='k', linestyle=linestyle, linewidth=1)
 
@@ -92,23 +132,23 @@ def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-', fig=None, a
         speeds = np.linalg.norm(pl_v[:, :], axis=0)
     else:
         speeds = np.linalg.norm(np.gradient(pl_p, t, axis=1), axis=0)
-    axes[1, 0].plot(
+    axes[1].plot(
         t, speeds, label="payload",
         color='k', linestyle=linestyle, linewidth=1)
 
     accels = np.gradient(speeds, t, axis=0)
-    axes[2, 0].plot(
+    axes[2].plot(
         t, accels, label="payload",
         color='k', linestyle=linestyle, linewidth=1)
 
-    jerks = np.gradient(accels, t, axis=0)
-    axes[3, 0].plot(
-        t, jerks, label="payload",
-        color='k', linestyle=linestyle, linewidth=1)
+    # jerks = np.gradient(accels, t, axis=0)
+    # axes[3].plot(
+    #     t, jerks, label="payload",
+    #     color='k', linestyle=linestyle, linewidth=1)
 
     # payload reference trajectory
     if pl_p_ref is not None:
-        axes[0, 0].plot(
+        axes[0].plot(
             t, pl_p_ref[2, :],
             color='gray', linestyle='-.', label="payload ref")
 
@@ -118,12 +158,20 @@ def plot_states_pl(t, pl_p, pl_v=None, pl_p_ref=None, linestyle='-', fig=None, a
             ax.legend()
 
     fig.tight_layout()
+    return fig, axes
 
 
 def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     """Plot constraints from OCP solution dictionary."""
     if fig is None or axes is None:
-        fig, axes = plt.subplots(2, 2, sharex=True, figsize=(12, 10))
+        fig, axes = plt.subplots(2, 2, sharex=True, figsize=(16, 10))
+
+    N = min(cf_cable_t.shape[1], cf_p.shape[2], pl_p.shape[1])
+
+    cf_cable_t = cf_cable_t[:, :N]
+    cf_p = cf_p[:, :, :N]
+    pl_p = pl_p[:, :N]
+
     # cable tension
     axes[0, 0].set_ylabel(f"Cable tension [N]")
     axes[0, 0].set_xlabel("Time [s]")
@@ -177,13 +225,14 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     fig.suptitle("OCP Constraints")
     fig.tight_layout()
 
+    return fig, axes
+
 
 def plot_3d(cf_p, pl_p, pl_p_ref, cf_radius, fig=None, axes=None):
     """Plot 3D trajectory of drones and payload."""
     if fig is None or axes is None:
         fig = plt.figure(figsize=(12, 12))
         axes = fig.add_subplot(111, projection="3d")
-        print("Warning: creating new figure and axes in plot_3d. This may cause multiple figures if called from plot_ocp.")
 
     for i in range(3):
         axes.plot([cf_p[i, 0, -1], pl_p[0, -1]],
@@ -210,6 +259,7 @@ def plot_3d(cf_p, pl_p, pl_p_ref, cf_radius, fig=None, axes=None):
                                        (pl_p_ref, 'payload ref', 'gray', '-.')]:
         plot_3d_pl(p, label=label, color=color, linestyle=linestyle,
                    fig=fig, axes=axes)
+    return fig, axes
 
 
 def plot_3d_cf(cf_p, linestyle='-', label_suffix='', fig=None, axes=None):
@@ -217,7 +267,6 @@ def plot_3d_cf(cf_p, linestyle='-', label_suffix='', fig=None, axes=None):
     if fig is None or axes is None:
         fig = plt.figure(figsize=(12, 12))
         axes = fig.add_subplot(111, projection="3d")
-        print("Warning: creating new figure and axes in plot_3d_cf. This may cause multiple figures if called from plot_ocp.")
     for i in range(3):
         axes.plot(
             cf_p[i, 0], cf_p[i, 1], cf_p[i, 2],
@@ -229,7 +278,6 @@ def plot_3d_pl(pl_p, label='payload', color='k', linestyle='-', fig=None, axes=N
     if fig is None or axes is None:
         fig = plt.figure(figsize=(12, 12))
         axes = fig.add_subplot(111, projection="3d")
-        print("Warning: creating new figure and axes in plot_3d_pl. This may cause multiple figures if called from plot_ocp.")
     axes.plot(
         pl_p[0],  pl_p[1],  pl_p[2],
         label=label, color=color, linestyle=linestyle)

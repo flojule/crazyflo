@@ -116,7 +116,7 @@ def save_poly7_csv(sol, folder, v_max=2.0, a_max=5.0):
     t = np.asarray(sol["t"], dtype=float).reshape(-1, 1)  # (N,1)
 
     for i in [1, 2, 3]:
-        csv_path = folder / f"cf{i}_traj.csv"
+        csv_path = folder / f"traj_cf{i}.csv"
 
         p_raw = np.asarray(sol[f"cf{i}_p"], dtype=float)
         if p_raw.shape == (t.shape[0], 3):

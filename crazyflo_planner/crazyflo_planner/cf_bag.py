@@ -27,6 +27,7 @@ def get_bag_data(bag_path):
     print("Topics in bag:")
     for topic in type_map:
         print(f"  {topic}: {type_map[topic]}")
+    print()
 
     cf1_pose = "/cf1/pose"
     cf2_pose = "/cf2/pose"
@@ -105,8 +106,8 @@ def get_bag_data(bag_path):
         dt = np.median(np.diff(t1))
         t_new = np.arange(0, t_end - t_start, dt)
 
-    print(f"Original time lengths: {len(t1)}, {len(t2)}, {len(t3)}")
-    print(f"New time length: {len(t_new)}")
+    # print(f"Original time lengths: {len(t1)}, {len(t2)}, {len(t3)}")
+    # print(f"New time length: {len(t_new)}")
 
     cf_p_new, cf_v_new, cf_a_new = [], [], []
     for j in range(3):

@@ -14,9 +14,8 @@ INITIAL_HEIGHT = 0.4
 
 LANDING_TIME = 2.0
 
-ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
-# ROOT_FOLDER = Path.home() / "winter-project/ws/src/crazyflo/crazyflo_planner"
-# ROOT_FOLDER = Path.home() / "winter-project/ws/src/crazyflo/crazyflo_planner/data/multi_trajectory"
+# ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
+ROOT_FOLDER = Path.home() / "winter-project/ws/"
 
 data_path = ROOT_FOLDER / "data"
 
