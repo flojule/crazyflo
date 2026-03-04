@@ -3,6 +3,7 @@ from typing import Optional, Tuple, List, Iterable, Dict
 import csv
 from dataclasses import dataclass
 
+
 @dataclass
 class Poly7Segment:
     duration: float
@@ -91,7 +92,9 @@ def _poly_eval(a: np.ndarray, t: np.ndarray) -> np.ndarray:
     return y
 
 
-def _segment_max_norms(coeffs_xyz: np.ndarray, T: float, samples: int = 200) -> Tuple[float, float, float]:
+def _segment_max_norms(
+        coeffs_xyz: np.ndarray, T: float, samples: int = 200
+) -> Tuple[float, float, float]:
     """
     coeffs_xyz shape (3,8): x,y,z poly7 coeffs.
     Return max ||v||, max ||a||, max ||j|| by sampling.
@@ -240,15 +243,19 @@ def fit_poly7_piecewise(
             for axis in range(3):
                 coeffs_xyz[axis] = _poly7_from_endpoint_conditions(
                     dt=T,
-                    p0=float(P[i, axis]), v0=float(V[i, axis]), a0=float(A[i, axis]), j0=float(J[i, axis]),
-                    p1=float(P[i + 1, axis]), v1=float(V[i + 1, axis]), a1=float(A[i + 1, axis]), j1=float(J[i + 1, axis]),
+                    p0=float(P[i, axis]), v0=float(V[i, axis]),
+                    a0=float(A[i, axis]), j0=float(J[i, axis]),
+                    p1=float(P[i + 1, axis]), v1=float(V[i + 1, axis]),
+                    a1=float(A[i + 1, axis]), j1=float(J[i + 1, axis]),
                 )
 
             # yaw poly7
             coeffs_yaw = _poly7_from_endpoint_conditions(
                 dt=T,
-                p0=float(yaw[i]), v0=float(Vy[i]), a0=float(Ay[i]), j0=float(Jy[i]),
-                p1=float(yaw[i + 1]), v1=float(Vy[i + 1]), a1=float(Ay[i + 1]), j1=float(Jy[i + 1]),
+                p0=float(yaw[i]), v0=float(Vy[i]),
+                a0=float(Ay[i]), j0=float(Jy[i]),
+                p1=float(yaw[i + 1]), v1=float(Vy[i + 1]),
+                a1=float(Ay[i + 1]), j1=float(Jy[i + 1]),
             )
 
             segs.append(
@@ -272,9 +279,14 @@ def fit_poly7_piecewise(
         violations = 0
         for i, seg in enumerate(segs):
             coeffs_xyz = np.stack([seg.coeffs_x, seg.coeffs_y, seg.coeffs_z], axis=0)
-            vmax_s, amax_s, jmax_s = _segment_max_norms(coeffs_xyz, seg.duration, samples=samples_per_seg)
+            vmax_s, amax_s, jmax_s = _segment_max_norms(
+                coeffs_xyz, seg.duration, samples=samples_per_seg)
 
-            ok = (vmax_s <= v_max + 1e-9) and (amax_s <= a_max + 1e-9) and (jmax_s <= j_max + 1e-9)
+            ok = (
+                (vmax_s <= v_max + 1e-9)
+                and (amax_s <= a_max + 1e-9)
+                and (jmax_s <= j_max + 1e-9)
+            )
             if not ok:
                 violations += 1
 
@@ -292,7 +304,7 @@ def fit_poly7_piecewise(
 
         if violations == 0:
             return segs
-        
+
         t_wp = np.concatenate([[0.0], np.cumsum(seg_T_work)])
         for axis in range(3):
             v, a, j = _finite_derivatives(t_wp, P[:, axis])
@@ -300,10 +312,18 @@ def fit_poly7_piecewise(
         Vy, Ay, Jy = _finite_derivatives(t_wp, yaw)
 
         # re-enforce boundary derivatives = 0
-        V[0] = 0.0; A[0] = 0.0; J[0] = 0.0
-        V[-1] = 0.0; A[-1] = 0.0; J[-1] = 0.0
-        Vy[0] = 0.0; Ay[0] = 0.0; Jy[0] = 0.0
-        Vy[-1] = 0.0; Ay[-1] = 0.0; Jy[-1] = 0.0
+        V[0] = 0.0
+        A[0] = 0.0
+        J[0] = 0.0
+        V[-1] = 0.0
+        A[-1] = 0.0
+        J[-1] = 0.0
+        Vy[0] = 0.0
+        Ay[0] = 0.0
+        Jy[0] = 0.0
+        Vy[-1] = 0.0
+        Ay[-1] = 0.0
+        Jy[-1] = 0.0
 
     return build_segments(seg_T_work)
 
@@ -499,4 +519,3 @@ def show_min_max_coeffs(segments: list[Poly7Segment]) -> None:
         print(f"  y^{n}: [{y_min:.3e}, {y_max:.3e}]")
         print(f"  z^{n}: [{z_min:.3e}, {z_max:.3e}]")
         print(f"  yaw^{n}: [{yaw_min:.3e}, {yaw_max:.3e}]")
-

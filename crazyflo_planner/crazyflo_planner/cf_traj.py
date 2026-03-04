@@ -46,7 +46,9 @@ def waypoints_to_poly7(
         raise ValueError("continuity_order must be 2 or 3")
 
     seg_len = np.linalg.norm(w[1:] - w[:-1], axis=1)
-    T = np.array([_min_time_1d(d, v_max, a_max) for d in seg_len], dtype=float) * float(time_safety)
+    T = np.array(
+        [_min_time_1d(d, v_max, a_max) for d in seg_len], dtype=float
+    ) * float(time_safety)
     T = np.maximum(T, 1e-3)
 
     t_knots = np.zeros(w.shape[0], dtype=float)
@@ -108,7 +110,8 @@ def timed_waypoints_to_poly7(
     Output:
       Poly7 (note: if stretching happens, output t_knots may be later than input).
     """
-    if not isinstance(timed_waypoints, dict) or "t" not in timed_waypoints or "p" not in timed_waypoints:
+    if (not isinstance(timed_waypoints, dict)
+            or "t" not in timed_waypoints or "p" not in timed_waypoints):
         raise ValueError("timed_waypoints must be a dict with keys {'t','p'}")
 
     t_in = np.asarray(timed_waypoints["t"], dtype=float).reshape(-1)

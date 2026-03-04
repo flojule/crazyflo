@@ -3,8 +3,6 @@ import numpy as np
 
 def generate_ellipse(r_A, r_B, height, grid):
     """Generate an elliptical trajectory in the horizontal plane."""
-    r_A = 0.6
-    r_B = 0.3
     waypoints = np.stack([r_A * (1.0 - np.cos(2 * np.pi * grid)),
                           r_B * np.sin(2 * np.pi * grid),
                           height * np.ones(grid.shape)
@@ -14,8 +12,6 @@ def generate_ellipse(r_A, r_B, height, grid):
 
 def generate_figure8(r_A, r_B, height, grid):
     """Generate a figure-8 trajectory in the horizontal plane."""
-    r_A = 0.6
-    r_B = 0.3
     waypoints = np.stack([r_A * np.sin(2 * np.pi * grid),
                           r_B * np.sin(4 * np.pi * grid) / 2,
                           height * np.ones(grid.shape)

@@ -8,37 +8,38 @@ import uav_trajectory
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--traj", type=str, help="CSV file containing polynomials")
-    parser.add_argument("--output", type=str, help="CSV file containing pos, vel, acc, jerk, snap")
-    parser.add_argument("--dt", default=0.01, type=float, help="CSV file containing polynomials")
-    parser.add_argument("--stretchtime", default=1.0, type=float, help="stretch time factor (smaller means faster)")
+    parser.add_argument("--output", type=str, help="CSV file with pos, vel, acc, jerk, snap")
+    parser.add_argument("--dt", default=0.01, type=float, help="time step in seconds")
+    parser.add_argument(
+        "--stretchtime", default=1.0, type=float,
+        help="stretch time factor (smaller means faster)")
     args = parser.parse_args()
 
     traj = uav_trajectory.Trajectory()
     traj.loadcsv(args.traj)
 
-
     traj.stretchtime(args.stretchtime)
 
-
     ts = np.arange(0, traj.duration, args.dt)
-    # t, pos, vel, acc, jerk, snap: 1 + 15 
+    # t, pos, vel, acc, jerk, snap: 1 + 15
     evals = np.empty((len(ts), 15 + 1))  # Additional column for 't'
     with open(args.output, "w") as f:
         for t, i in zip(ts, range(0, len(ts))):
             e = traj.eval(t)
             evals[i, 0] = t
             # pos[2] = 0
-            evals[i, 1:4]  = e.pos
-            evals[i, 4:7]  = e.vel
+            evals[i, 1:4] = e.pos
+            evals[i, 4:7] = e.vel
             evals[i, 7:10] = e.acc
             evals[i, 10:13] = e.jerk
             evals[i, 13:16] = e.snap
-        header = "t,posx,posy,posz,velx,vely,velz,accx,accy,accz,jerkx,jerky,jerkz,snapx,snapy,snapz"
+        header = (
+            "t,posx,posy,posz,velx,vely,velz,accx,accy,accz,"
+            "jerkx,jerky,jerkz,snapx,snapy,snapz"
+        )
 
         evals_with_header = np.vstack((header.split(','), evals))
         np.savetxt(f, evals_with_header, delimiter=",", fmt='%s')
-
-
 
     # Extract position, velocity, and acceleration, jerk, snap data from evals
     pos = evals[:, 1:4]
@@ -52,7 +53,7 @@ if __name__ == "__main__":
 
     # Create a PDF file to save the plots
     pdf_filename = os.path.splitext(args.output)[0] + '.pdf'
-    with PdfPages(pdf_filename) as pdf:  
+    with PdfPages(pdf_filename) as pdf:
         axes = ["x", "y", "z"]
         # Page 1: pos
         fig, ax = plt.subplots(3, 1, figsize=(8, 12))
@@ -90,7 +91,6 @@ if __name__ == "__main__":
         pdf.savefig(fig)
         plt.close(fig)
 
-
         # Page 4: jerk
         fig, ax = plt.subplots(3, 1, figsize=(8, 12))
         for i in range(3):
@@ -114,4 +114,3 @@ if __name__ == "__main__":
         fig.suptitle('Snap')
         pdf.savefig(fig)
         plt.close(fig)
-

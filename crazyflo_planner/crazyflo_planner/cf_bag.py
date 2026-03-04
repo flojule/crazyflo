@@ -57,15 +57,8 @@ def get_bag_data(bag_path):
 
     t1, t2, t3 = [], [], []
     cf1_p, cf2_p, cf3_p = [], [], []
-    cf1_v, cf2_v, cf3_v = [], [], []
-    cf1_a, cf2_a, cf3_a = [], [], []
-
     poses = ["/cf1/pose", "/cf2/pose", "/cf3/pose"]
-    vels = ["/cf1/vel", "/cf2/vel", "/cf3/vel"]
-    accels = ["/cf1/acceleration", "/cf2/acceleration", "/cf3/acceleration"]
     cf_p = [cf1_p, cf2_p, cf3_p]
-    cf_v = [cf1_v, cf2_v, cf3_v]
-    cf_a = [cf1_a, cf2_a, cf3_a]
     t = [t1, t2, t3]
 
     for j in range(3):
@@ -75,7 +68,6 @@ def get_bag_data(bag_path):
             cf_p[j] = np.empty((3, 0))
             continue
         for i in range(len(bag_data_topics[pose])):
-            # t_ = bag_data_topics[pose][i]["msg"]["header"]["stamp"]["sec"] + bag_data_topics[pose][i]["msg"]["header"]["stamp"]["nanosec"] * 1e-9
             t_ = bag_data_topics[pose][i]["time"] * 1e-9
             t[j].append(t_)
             cf_p[j].append(

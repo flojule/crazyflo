@@ -144,7 +144,6 @@ class PayloadSim(Node):
 
         self.payload_pose = payload_pose
 
-
     def get_tfs(self):
         """Get transforms for all drones."""
         for (i, tf) in enumerate(self.tf_names):
@@ -201,7 +200,7 @@ class PayloadSim(Node):
             self.payload_state = PayloadState.DETACHED
             self.get_logger().info("Payload detached.")
         return response
-    
+
     def get_payload_pose(self):
         """Get current payload pose."""
         return self.payload_pose
@@ -213,4 +212,3 @@ def main(args=None):
     node = PayloadSim()
     rclpy.spin(node)
     rclpy.shutdown()
-

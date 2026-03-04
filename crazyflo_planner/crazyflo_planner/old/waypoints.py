@@ -28,10 +28,10 @@ def _D3_matrix(n: int) -> np.ndarray:
     m = n - 3
     D3 = np.zeros((m, n), dtype=float)
     for k in range(m):
-        D3[k, k]     = -1.0
-        D3[k, k + 1] =  3.0
+        D3[k, k] = -1.0
+        D3[k, k + 1] = 3.0
         D3[k, k + 2] = -3.0
-        D3[k, k + 3] =  1.0
+        D3[k, k + 3] = 1.0
     return D3
 
 
@@ -61,20 +61,44 @@ def _build_constraints(n: int, idx: np.ndarray) -> Tuple[np.ndarray, List[Tuple[
         specs.append(("wp", i))
 
     # start (forward) discrete derivatives == 0
-    r = np.zeros(n); r[1]=1; r[0]=-1
-    rows.append(r); specs.append(("zero", -1))
-    r = np.zeros(n); r[2]=1; r[1]=-2; r[0]=1
-    rows.append(r); specs.append(("zero", -1))
-    r = np.zeros(n); r[3]=1; r[2]=-3; r[1]=3; r[0]=-1
-    rows.append(r); specs.append(("zero", -1))
+    r = np.zeros(n)
+    r[1] = 1
+    r[0] = -1
+    rows.append(r)
+    specs.append(("zero", -1))
+    r = np.zeros(n)
+    r[2] = 1
+    r[1] = -2
+    r[0] = 1
+    rows.append(r)
+    specs.append(("zero", -1))
+    r = np.zeros(n)
+    r[3] = 1
+    r[2] = -3
+    r[1] = 3
+    r[0] = -1
+    rows.append(r)
+    specs.append(("zero", -1))
 
     # end (backward) discrete derivatives == 0
-    r = np.zeros(n); r[K]=1; r[K-1]=-1
-    rows.append(r); specs.append(("zero", -1))
-    r = np.zeros(n); r[K]=1; r[K-1]=-2; r[K-2]=1
-    rows.append(r); specs.append(("zero", -1))
-    r = np.zeros(n); r[K]=1; r[K-1]=-3; r[K-2]=3; r[K-3]=-1
-    rows.append(r); specs.append(("zero", -1))
+    r = np.zeros(n)
+    r[K] = 1
+    r[K-1] = -1
+    rows.append(r)
+    specs.append(("zero", -1))
+    r = np.zeros(n)
+    r[K] = 1
+    r[K-1] = -2
+    r[K-2] = 1
+    rows.append(r)
+    specs.append(("zero", -1))
+    r = np.zeros(n)
+    r[K] = 1
+    r[K-1] = -3
+    r[K-2] = 3
+    r[K-3] = -1
+    rows.append(r)
+    specs.append(("zero", -1))
 
     return np.vstack(rows), specs
 
@@ -114,7 +138,9 @@ def _solve_min_jerk_constrained(wp: np.ndarray, idx: np.ndarray, K: int) -> np.n
     return sol[:n, :]
 
 
-def _steps_from_waypoints(wp: np.ndarray, dt: float, v_max: float, min_steps_per_seg: int) -> np.ndarray:
+def _steps_from_waypoints(
+        wp: np.ndarray, dt: float, v_max: float, min_steps_per_seg: int
+) -> np.ndarray:
     N = wp.shape[0]
     steps = np.zeros(N - 1, dtype=int)
     for i in range(N - 1):
@@ -178,8 +204,11 @@ def smooth_traj(
         p = _solve_min_jerk_constrained(wp, idx, K)
 
         vmax_s, amax_s, jmax_s = _max_norms(p, dt)
-        if not (math.isfinite(vmax_s) and math.isfinite(amax_s) and math.isfinite(jmax_s)):
-            raise FloatingPointError("Non-finite v/a/j detected; check waypoints (NaN/inf) and dt.")
+        if not (math.isfinite(vmax_s)
+                and math.isfinite(amax_s) and math.isfinite(jmax_s)):
+            raise FloatingPointError(
+                "Non-finite v/a/j detected; check waypoints (NaN/inf) and dt."
+            )
 
         vr = vmax_s / v_max
         ar = amax_s / a_max
@@ -197,7 +226,10 @@ def smooth_traj(
         s = min(s, max_scale_per_iter)
 
         # Scale steps per segment (integer, monotone, safe)
-        new_steps = np.maximum(min_steps_per_seg, np.ceil(steps.astype(float) * s).astype(np.int64))
+        new_steps = np.maximum(
+            min_steps_per_seg,
+            np.ceil(steps.astype(float) * s).astype(np.int64)
+        )
 
         if np.array_equal(new_steps, steps):
             # ensure progress
@@ -231,12 +263,12 @@ if __name__ == "__main__":
             pl_height * np.ones(grid.shape),
         ], axis=1)
     else:
-         waypoints = np.array([
-                [0.0, 0.0, 0.0],
-                [1.0, 0.5, 0.2],
-                [2.0, 0.0, 0.4],
-                [3.0, 0.2, 0.0],
-            ], dtype=float)
+        waypoints = np.array([
+            [0.0, 0.0, 0.0],
+            [1.0, 0.5, 0.2],
+            [2.0, 0.0, 0.4],
+            [3.0, 0.2, 0.0],
+        ], dtype=float)
 
     if loops > 1:
         # extend trajectory for infinite flight

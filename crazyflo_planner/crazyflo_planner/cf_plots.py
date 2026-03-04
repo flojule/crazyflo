@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
-from pathlib import Path
 
 COLORS = ['r', 'g', 'b']
 
@@ -16,7 +15,9 @@ def plot_ocp(ocp_data: dict, constraints=False, animate=False, folder=None):
     cf_p = np.stack([ocp_data["cf1_p"], ocp_data["cf2_p"], ocp_data["cf3_p"]])
     cf_v = np.stack([ocp_data["cf1_v"], ocp_data["cf2_v"], ocp_data["cf3_v"]])
     cf_a = np.stack([ocp_data["cf1_a"], ocp_data["cf2_a"], ocp_data["cf3_a"]])
-    cf_cable_t = np.stack([ocp_data["cf1_cable_t"], ocp_data["cf2_cable_t"], ocp_data["cf3_cable_t"]])
+    cf_cable_t = np.stack([
+        ocp_data["cf1_cable_t"], ocp_data["cf2_cable_t"], ocp_data["cf3_cable_t"]
+    ])
     pl_p_ref = ocp_data["pl_p_ref"]
     cable_l = ocp_data["cable_l"]
     cf_radius = ocp_data["cf_radius"]
@@ -43,7 +44,10 @@ def plot_xyz(data, t_offset=0.0, t_total=None, fig=None, axes=None):
     if fig is None or axes is None:
         fig, axes = plt.subplots(3, 3, sharex=True, figsize=(20, 12))
     y_labels = ["x", "y", "z"]
-    plot_labels = ["cf1", "cf2", "cf3"] if t_offset == 0.0 else ["cf1 (bag)", "cf2 (bag)", "cf3 (bag)"]
+    plot_labels = (
+        ["cf1", "cf2", "cf3"] if t_offset == 0.0
+        else ["cf1 (bag)", "cf2 (bag)", "cf3 (bag)"]
+    )
     t = data["t"]
     cf_p = np.stack([data["cf1_p"], data["cf2_p"], data["cf3_p"]])
     if cf_p.shape == (3, 3, t.shape[0]):
@@ -53,7 +57,7 @@ def plot_xyz(data, t_offset=0.0, t_total=None, fig=None, axes=None):
     for i in range(3):
         for j in range(3):  # 3 drones
             axes[i, j].plot(t - t_offset, cf_p[j, i, :],
-                         label=plot_labels[j], linewidth=1)
+                            label=plot_labels[j], linewidth=1)
             axes[i, j].set_ylabel(f"Position {y_labels[i]} [m]")
             axes[i, j].grid(True)
             axes[i, j].legend()
@@ -173,31 +177,31 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     pl_p = pl_p[:, :N]
 
     # cable tension
-    axes[0, 0].set_ylabel(f"Cable tension [N]")
+    axes[0, 0].set_ylabel("Cable tension [N]")
     axes[0, 0].set_xlabel("Time [s]")
     for i in range(3):
         axes[0, 0].plot(cf_cable_t[i, :], label=f"Drone {i+1}", color=COLORS[i])
     axes[0, 0].axhline(0.05, color='gray',
-                           linestyle='--', linewidth=1, label='min tension')
+                       linestyle='--', linewidth=1, label='min tension')
     axes[0, 0].axhline(0.15, color='gray',
-                           linestyle='--', linewidth=1, label='max tension')
+                       linestyle='--', linewidth=1, label='max tension')
     axes[0, 0].grid(True)
     axes[0, 0].legend()
 
     # cable tension z component
-    axes[1, 0].set_ylabel(f"Cable tension z [N]")
+    axes[1, 0].set_ylabel("Cable tension z [N]")
     axes[1, 0].set_xlabel("Time [s]")
     for i in range(3):
         axes[1, 0].plot(
             cf_cable_t[i, :] * (cf_p[i, 2, :] - pl_p[2, :]) / (cable_l),
             label=f"Drone {i+1}", color=COLORS[i])
     axes[1, 0].axhline(0.15, color='gray',
-                           linestyle='--', linewidth=1, label='max tension')
+                       linestyle='--', linewidth=1, label='max tension')
     axes[1, 0].grid(True)
     axes[1, 0].legend()
 
     # cable angle
-    axes[0, 1].set_ylabel(f"Cable angle [deg]")
+    axes[0, 1].set_ylabel("Cable angle [deg]")
     axes[0, 1].set_xlabel("Time [s]")
     z_axis = np.array([0.0, 0.0, 1.0])
     for i in range(3):
@@ -209,16 +213,16 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     axes[0, 1].legend()
 
     # drone collision
-    axes[1, 1].set_ylabel(f"Drone min distance [m]")
+    axes[1, 1].set_ylabel("Drone min distance [m]")
     axes[1, 1].set_xlabel("Time [s]")
     for i in range(3):
         pos_cf_cf = np.linalg.norm(cf_p[(i+1) % 3, :, :] - cf_p[i, :, :],
                                    axis=0)
         axes[1, 1].plot(
             pos_cf_cf,
-            label=f"Drone {i+1} to Drone {(i+2)%3 +1}", color=COLORS[i])
+            label=f"Drone {i+1} to Drone {(i+2) % 3 + 1}", color=COLORS[i])
     axes[1, 1].axhline(0.4, color='gray',
-                           linestyle='--', linewidth=1, label='min distance')
+                       linestyle='--', linewidth=1, label='min distance')
     axes[1, 1].grid(True)
     axes[1, 1].legend()
 
@@ -315,17 +319,21 @@ def animate_ocp(ocp_data: dict):
                      ocp_data["cf2_p"],
                      ocp_data["cf3_p"]])
 
-    cf_radius = ocp_data["cf_radius"]
-
     M = pl_p.shape[1]
 
     fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(111, projection="3d")
 
     # trajectory lines
-    pl_ref_line, = ax.plot([], [], [], label="payload ref", color='gray', linestyle='-.', linewidth=1)
-    pl_line, = ax.plot([], [], [], label="payload", color='k', linestyle='-', linewidth=1)
-    cf_lines = [ax.plot([], [], [],label=f"cf{i+1}", color=COLORS[i], linestyle='-', linewidth=1)[0] for i in range(3)]
+    pl_ref_line, = ax.plot(
+        [], [], [], label="payload ref", color='gray', linestyle='-.', linewidth=1)
+    pl_line, = ax.plot(
+        [], [], [], label="payload", color='k', linestyle='-', linewidth=1)
+    cf_lines = [
+        ax.plot([], [], [], label=f"cf{i+1}", color=COLORS[i],
+                linestyle='-', linewidth=1)[0]
+        for i in range(3)
+    ]
 
     # current markers
     pl_point, = ax.plot([], [], [], "ko", markersize=10)
@@ -411,11 +419,15 @@ def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5,
     """Plot data from rosbag dictionary."""
     if fig is None or axes is None:
         fig, axes = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
-        print("Warning: creating new figure and axes in plot_bag. This may cause multiple figures if called from plot_ocp.")
+        print(
+            "Warning: creating new figure and axes in plot_bag. "
+            "This may cause multiple figures if called from plot_ocp.")
     if fig_3d is None or axes_3d is None:
         fig_3d = plt.figure(figsize=(12, 12))
         axes_3d = fig_3d.add_subplot(111, projection="3d")
-        print("Warning: creating new 3d figure and axes in plot_bag. This may cause multiple figures if called from plot_ocp.")
+        print(
+            "Warning: creating new 3d figure and axes in plot_bag. "
+            "This may cause multiple figures if called from plot_ocp.")
     t = bag_data["t"]
     for ax in axes.flatten():
         ax.set_xlim(-1, t_total + 1)
@@ -451,13 +463,23 @@ def plot_error(ocp_data: dict, bag_data: dict, t_offset=0.0, t_total=10.0,
 
     if fig is None or axes is None:
         fig, axes = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
-        print("Warning: creating new figure and axes in plot_error. This may cause multiple figures if called from plot_ocp.")
+        print(
+            "Warning: creating new figure and axes in plot_error. "
+            "This may cause multiple figures if called from plot_ocp.")
 
-    bag_min = {"t": bag_data["t"], "cf1_p": bag_data["cf1_p"], "cf2_p": bag_data["cf2_p"], "cf3_p": bag_data["cf3_p"]}
+    bag_min = {
+        "t": bag_data["t"],
+        "cf1_p": bag_data["cf1_p"],
+        "cf2_p": bag_data["cf2_p"],
+        "cf3_p": bag_data["cf3_p"],
+    }
     bag_min["t"] = bag_min["t"] - t_offset
-    ocp_min = {"t": ocp_data["t"], "cf1_p": ocp_data["cf1_p"], "cf2_p": ocp_data["cf2_p"], "cf3_p": ocp_data["cf3_p"],
-            "cf1_v": ocp_data["cf1_v"], "cf2_v": ocp_data["cf2_v"], "cf3_v": ocp_data["cf3_v"],
-            "cf1_a": ocp_data["cf1_a"], "cf2_a": ocp_data["cf2_a"], "cf3_a": ocp_data["cf3_a"]}
+    ocp_min = {
+        "t": ocp_data["t"],
+        "cf1_p": ocp_data["cf1_p"], "cf2_p": ocp_data["cf2_p"], "cf3_p": ocp_data["cf3_p"],
+        "cf1_v": ocp_data["cf1_v"], "cf2_v": ocp_data["cf2_v"], "cf3_v": ocp_data["cf3_v"],
+        "cf1_a": ocp_data["cf1_a"], "cf2_a": ocp_data["cf2_a"], "cf3_a": ocp_data["cf3_a"],
+    }
 
     t_ocp = np.asarray(ocp_data["t"], dtype=float)
     t_bag = np.asarray(bag_data["t"], dtype=float)
@@ -510,10 +532,12 @@ def plot_states_error(t, p_error, v_error=None, a_error=None, fig=None, axes=Non
     """Plot error between OCP solution and rosbag data."""
     if fig is None or axes is None:
         fig, axes = plt.subplots(4, 2, sharex=True, figsize=(16, 14))
-        print("Warning: creating new figure and axes in plot_states_error. This may cause multiple figures if called from plot_ocp.")
-    axes[0, 1].set_ylabel(f"Position error [m]")
-    axes[1, 1].set_ylabel(f"Velocity error [m/s]")
-    axes[2, 1].set_ylabel(f"Acceleration error [m/s]")
+        print(
+            "Warning: creating new figure and axes in plot_states_error. "
+            "This may cause multiple figures if called from plot_ocp.")
+    axes[0, 1].set_ylabel("Position error [m]")
+    axes[1, 1].set_ylabel("Velocity error [m/s]")
+    axes[2, 1].set_ylabel("Acceleration error [m/s]")
     axes[2, 1].set_xlabel("Time [s]")
 
     for i in range(3):
@@ -583,8 +607,11 @@ def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float):
 
     # Check degeneracy (centers nearly collinear / coincident)
     eps = 1e-12
-    if np.linalg.norm(n1) < eps or np.linalg.norm(n2) < eps or np.linalg.norm(np.cross(n1, n2)) < eps:
-        raise ValueError("Degenerate sphere configuration (centers nearly collinear or coincident).")
+    if (np.linalg.norm(n1) < eps or np.linalg.norm(n2) < eps
+            or np.linalg.norm(np.cross(n1, n2)) < eps):
+        raise ValueError(
+            "Degenerate sphere configuration (centers nearly collinear or coincident)."
+        )
 
     d1 = 0.5 * (np.dot(c1, c1) - np.dot(c0, c0))
     d2 = 0.5 * (np.dot(c2, c2) - np.dot(c0, c0))

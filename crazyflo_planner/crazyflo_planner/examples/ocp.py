@@ -70,6 +70,7 @@ def solve_ocp(N: int = 50, T: float = 2.0, umax: float = 2.0):
 
     return t, x_sol, v_sol, u_sol
 
+
 def plot_states(t, x, v, u):
     fig, axes = plt.subplots(1, 3, sharex=True, figsize=(16, 8))
     axes[0].grid()

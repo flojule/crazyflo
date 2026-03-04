@@ -2,11 +2,9 @@ import cf_waypoints
 import cf_solver
 import cf_plots
 import cf_csv
-import cf_bag
 import cf_traj
 
 from pathlib import Path
-import numpy as np
 import matplotlib.pyplot as plt
 
 ROOT_FOLDER = Path.home() / "winter-project/ws/"
@@ -34,7 +32,10 @@ if __name__ == "__main__":
     # convert pl_poly7 to timed waypoints for OCP
     pl_timed_waypoints = cf_traj.poly7_to_timed_waypoints(pl_poly7)
 
-    print(f"traj total time {pl_timed_waypoints['t'][-1]:.2f} s, with {len(pl_timed_waypoints['t'])} points")
+    print(
+        f"traj total time {pl_timed_waypoints['t'][-1]:.2f} s, "
+        f"with {len(pl_timed_waypoints['t'])} points"
+    )
 
     # solve OCP for crazyflie trajectories
     sol = cf_solver.solve_ocp(

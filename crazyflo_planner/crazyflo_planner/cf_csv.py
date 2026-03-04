@@ -100,7 +100,10 @@ def _as_N3(x, N, name="array"):
     if x.shape == (1,) or x.shape == ():
         return np.full((N, 3), float(x))
 
-    raise ValueError(f"{name} must be (N,3)/(3,N) or (N-1,3)/(3,N-1) or broadcastable; got {x.shape}, N={N}")
+    raise ValueError(
+        f"{name} must be (N,3)/(3,N) or (N-1,3)/(3,N-1) or broadcastable; "
+        f"got {x.shape}, N={N}"
+    )
 
 
 def save_poly7_csv(sol, folder, v_max=2.0, a_max=5.0):
@@ -166,4 +169,3 @@ def save_poly7_csv(sol, folder, v_max=2.0, a_max=5.0):
 
                 writer.writerow(row)
     print(f"Poly7 trajectory CSV files for cf1, cf2, cf3 saved to {folder}")
-

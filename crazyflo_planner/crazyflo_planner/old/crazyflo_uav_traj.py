@@ -40,13 +40,18 @@ if __name__ == "__main__":
         pl_timed_waypoints = cf_traj.poly7_to_timed_waypoints(pl_poly7)
 
     if not LOCAL:
-        # ./build/genTrajectory -i crazyflo/pl_waypoints.csv --v_max 2.0 --a_max 5.0 -o crazyflo/pl_traj.csv
-        # python3 scripts/gen_traj.py --traj crazyflo/pl_traj.csv --output crazyflo/pl_time_pos.csv --dt 0.1 --stretchtime 1.0
+        # ./build/genTrajectory -i crazyflo/pl_waypoints.csv
+        # --v_max 2.0 --a_max 5.0 -o crazyflo/pl_traj.csv
+        # python3 scripts/gen_traj.py --traj crazyflo/pl_traj.csv
+        # --output crazyflo/pl_time_pos.csv --dt 0.1 --stretchtime 1.0
         # pl_traj_csv = data_folder / "pl_traj.csv"
         pl_time_pos_csv = UAV_TRAJ_FOLDER / "crazyflo/pl_time_pos.csv"
         pl_timed_waypoints = cf_csv.read_time_pos_csv(pl_time_pos_csv)
 
-    print(f"traj total time {pl_timed_waypoints['t'][-1]:.2f} s, with {len(pl_timed_waypoints['t'])} points")
+    print(
+        f"traj total time {pl_timed_waypoints['t'][-1]:.2f} s, "
+        f"with {len(pl_timed_waypoints['t'])} points"
+    )
 
     # solve OCP for crazyflie trajectories
     sol = cf_solver.solve_ocp(
@@ -69,9 +74,12 @@ if __name__ == "__main__":
         cf_csv.save_poly7_csv(sol, folder=data_folder, v_max=2.0, a_max=5.0)
 
     # # C++
-    # python3 ./scripts/generate_trajectory.py crazyflo/cf1_time_pos.csv crazyflo/cf1.csv --pieces 5
-    # python3 ./scripts/generate_trajectory.py crazyflo/cf1_time_pos.csv crazyflo/cf2.csv --pieces 5
-    # python3 ./scripts/generate_trajectory.py crazyflo/cf1_time_pos.csv crazyflo/cf3.csv --pieces 5
+    # python3 ./scripts/generate_trajectory.py
+    # crazyflo/cf1_time_pos.csv crazyflo/cf1.csv --pieces 5
+    # python3 ./scripts/generate_trajectory.py
+    # crazyflo/cf1_time_pos.csv crazyflo/cf2.csv --pieces 5
+    # python3 ./scripts/generate_trajectory.py
+    # crazyflo/cf1_time_pos.csv crazyflo/cf3.csv --pieces 5
 
     # bag data
     if PLOT_BAG:
@@ -81,7 +89,7 @@ if __name__ == "__main__":
         t_total = ocp_data["t"][-1] - ocp_data["t"][0]
         t_offset = 0.0
 
-        bag_name = "rosbag2_2026_02_24-17_33_56"  #  rosbag2_2026_02_24-17_30_27
+        bag_name = "rosbag2_2026_02_24-17_33_56"  # rosbag2_2026_02_24-17_30_27
         bag_path = BAG_FOLDER / bag_name
         bag_data = cf_bag.get_bag_data(bag_path)
         f_states, a_states, f_3d, a_3d = cf_plots.plot_bag(

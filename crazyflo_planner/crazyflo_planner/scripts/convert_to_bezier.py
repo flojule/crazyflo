@@ -27,9 +27,9 @@ with open(trajfile, 'r') as csvfile:
 
 trajstr = trajstr[1:]
 traj = []
-for l in trajstr:
+for row in trajstr:
     tr = []
-    for p in l[:25]:
+    for p in row[:25]:
         tr.append(float(p))
     traj.append(tr)
 
@@ -41,10 +41,9 @@ for k in range(0, 8):
         if i > k:
             matrixrow.append(0)
         else:
-            eff = comb(7-i, k-i) * pow(-1, k-i) * comb(7,i)
+            eff = comb(7-i, k-i) * pow(-1, k-i) * comb(7, i)
             matrixrow.append(eff)
     matrix.append(matrixrow)
-
 
 
 matrixnp = np.array(matrix)

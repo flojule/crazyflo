@@ -1,9 +1,6 @@
-import cf_waypoints
 import cf_solver
 import cf_plots
-import cf_csv
 import cf_bag
-import cf_traj
 
 from pathlib import Path
 
@@ -18,10 +15,7 @@ plot_folder = ROOT_FOLDER / "figures"
 plot_folder.mkdir(parents=True, exist_ok=True)
 
 PLOT_BAG = False
-if PLOT_BAG:
-    data_folder = bag_path / "data"
-else:
-    data_folder = ROOT_FOLDER / "data"
+data_folder = ROOT_FOLDER / "data"
 
 
 if __name__ == "__main__":
@@ -49,7 +43,8 @@ if __name__ == "__main__":
     cf_solver.print_ocp_stats(ocp_sol)
 
     # plot OCP solution and animate
-    f_states, a_states, f_constr, a_constr, f_3d, a_3d = cf_plots.plot_ocp(ocp_sol, constraints=False)
+    f_states, a_states, f_constr, a_constr, f_3d, a_3d = cf_plots.plot_ocp(
+        ocp_sol, constraints=False)
     # cf_plots.animate_ocp(ocp_sol)
     f_xyz, a_xyz = cf_plots.plot_xyz(ocp_sol)
 
@@ -67,7 +62,6 @@ if __name__ == "__main__":
         f_xyz, a_xyz = cf_plots.plot_xyz(
             bag_data, t_offset, t_total,
             fig=f_xyz, axes=a_xyz)
-
 
     # cf_plots.save_plots(f_states, f_constr, f_3d, plot_folder)
 

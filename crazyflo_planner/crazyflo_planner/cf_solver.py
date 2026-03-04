@@ -165,8 +165,8 @@ def solve_ocp(
         if k < M - 2:  # jerk
             dt_k = t_grid[k+1] - t_grid[k]
 
-            J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[:, k])) * dt_k  # position tracking
-            # J += w_pl_v * ca.sumsqr(pl_v[:, k] - ca.DM(pl_v_ref[:, k])) * dt_k  # velocity tracking
+            J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(pl_p_ref[:, k])) * dt_k  # position
+            # J += w_pl_v * ca.sumsqr(pl_v[:, k] - ca.DM(pl_v_ref[:, k])) * dt_k
 
             pl_a = ca.vertcat(pl_v[:, k+1] - pl_v[:, k]) / dt_k
             dt_k1 = t_grid[k+2] - t_grid[k+1]
@@ -264,8 +264,12 @@ def solve_ocp(
         "cf1_p": cf_p_sol[0], "cf2_p": cf_p_sol[1], "cf3_p": cf_p_sol[2],
         "cf1_v": cf_v_sol[0], "cf2_v": cf_v_sol[1], "cf3_v": cf_v_sol[2],
         "cf1_a": cf_a_sol[0], "cf2_a": cf_a_sol[1], "cf3_a": cf_a_sol[2],
-        "cf1_cable_t": cf_cable_t_sol[0], "cf2_cable_t": cf_cable_t_sol[1], "cf3_cable_t": cf_cable_t_sol[2],
-        "cf1_cable_dir": cf_cable_dir_sol[0], "cf2_cable_dir": cf_cable_dir_sol[1], "cf3_cable_dir": cf_cable_dir_sol[2],
+        "cf1_cable_t": cf_cable_t_sol[0],
+        "cf2_cable_t": cf_cable_t_sol[1],
+        "cf3_cable_t": cf_cable_t_sol[2],
+        "cf1_cable_dir": cf_cable_dir_sol[0],
+        "cf2_cable_dir": cf_cable_dir_sol[1],
+        "cf3_cable_dir": cf_cable_dir_sol[2],
         "pl_p_ref": pl_p_ref,
         "cable_l": cable_l,
         "cf_radius": cf_radius,
