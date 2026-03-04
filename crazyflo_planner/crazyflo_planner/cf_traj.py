@@ -21,8 +21,8 @@ class Poly7:
 
 def waypoints_to_poly7(
     waypoints: np.ndarray,
-    v_max: float,
-    a_max: float,
+    v_max: float = 2.0,
+    a_max: float = 5.0,
     time_safety: float = 1.15,
     continuity_order: int = 3,   # 2 => C2 (p,v,a), 3 => C3 (p,v,a,j)
 ) -> Poly7:

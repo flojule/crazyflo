@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     # print OCP solution stats and save solution to csv
     cf_solver.print_ocp_stats(sol)
-    cf_solver.save_ocp(sol, filename="ocp.npz", path=data_folder)
+    cf_solver.save_ocp(sol, path=data_folder)
     cf_csv.save_time_pos_csv(sol, path=data_folder)
 
     # plot OCP solution and animate

@@ -2,12 +2,11 @@ import cf_waypoints
 import cf_solver
 import cf_plots
 import cf_csv
-import cf_bag
-import cf_traj
+import cf_obstacles
 
 from pathlib import Path
-import numpy as np
 import matplotlib.pyplot as plt
+
 
 ROOT_FOLDER = Path.home() / "winter-project/ws/"
 
@@ -20,33 +19,39 @@ PLOT_OCP = True
 
 
 if __name__ == "__main__":
+    trajs = ['line', 'ellipse', 'figure8', 'random']
+    traj = trajs[0]
+    obstacles_types = [None, 'vertical_passage', 'horizontal_passage', 'course']
+    obstacles_type = obstacles_types[3]
+    gap = 0.5  # gap size for obstacles in m
+    length = 10.0  # length of obstacle course in m
+
     pl_height = 0.5  # payload height in m
     cable_l = 0.5  # cable lengths
-    pl_v_max, pl_a_max = 5.0, 10.0  # payload max velocity and acceleration
-    cf_v_max, cf_a_max = 5.0, 10.0  # cf max velocity and acceleration
+    cf_v_max, cf_a_max = 2.0, 5.0  # cf max velocity and acceleration
+
+    # obstacles
+    if obstacles_type is None or traj != 'line':
+        obstacles = []  # only add obstacles for non-line trajs
+    else:
+        obstacles = cf_obstacles.get_obstacles(obstacles_type, gap=gap, length=length)
 
     # generate pl_waypoints and save to csv
     pl_waypoints = cf_waypoints.generate_waypoints(
-        traj='ellipse', height=pl_height, N=6, folder=data_folder)
-
-    # convert pl positions to polynomial trajectory with time grid
-    pl_poly7 = cf_traj.waypoints_to_poly7(pl_waypoints, v_max=pl_v_max, a_max=pl_a_max)
-    # convert pl_poly7 to timed waypoints for OCP
-    pl_timed_waypoints = cf_traj.poly7_to_timed_waypoints(pl_poly7)
-
-    print(f"traj total time {pl_timed_waypoints['t'][-1]:.2f} s, with {len(pl_timed_waypoints['t'])} points")
+        traj=traj, height=pl_height, length=length, N=10, folder=data_folder)
 
     # solve OCP for crazyflie trajectories
     sol = cf_solver.solve_ocp(
-        pl_traj=pl_timed_waypoints,
+        waypoints=pl_waypoints,
         cable_l=cable_l,
         cf_v_max=cf_v_max,
         cf_a_max=cf_a_max,
+        obstacles=obstacles,
     )
 
     # print OCP solution stats and save solution to csv
     cf_solver.print_ocp_stats(sol)
-    cf_solver.save_ocp(sol, filename="ocp.npz", path=data_folder)
+    cf_solver.save_ocp(sol, path=data_folder)
     cf_csv.save_time_pos_csv(sol, path=data_folder)
 
     # generate cf_waypoints and save to csv

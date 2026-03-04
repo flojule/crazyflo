@@ -1,10 +1,10 @@
 import numpy as np
 
 
-def generate_ellipse(r_A, r_B, height, grid):
+def generate_ellipse(r_A=0.6, r_B=0.3, height=0.5, grid=None):
     """Generate an elliptical trajectory in the horizontal plane."""
-    r_A = 0.6
-    r_B = 0.3
+    if grid is None:
+        grid = np.linspace(0, 1, 20)
     waypoints = np.stack([r_A * (1.0 - np.cos(2 * np.pi * grid)),
                           r_B * np.sin(2 * np.pi * grid),
                           height * np.ones(grid.shape)
@@ -12,10 +12,10 @@ def generate_ellipse(r_A, r_B, height, grid):
     return waypoints
 
 
-def generate_figure8(r_A, r_B, height, grid):
+def generate_figure8(r_A=0.6, r_B=0.6, height=0.5, grid=None):
     """Generate a figure-8 trajectory in the horizontal plane."""
-    r_A = 0.6
-    r_B = 0.3
+    if grid is None:
+        grid = np.linspace(0, 1, 20)
     waypoints = np.stack([r_A * np.sin(2 * np.pi * grid),
                           r_B * np.sin(4 * np.pi * grid) / 2,
                           height * np.ones(grid.shape)
@@ -23,7 +23,7 @@ def generate_figure8(r_A, r_B, height, grid):
     return waypoints
 
 
-def generate_line(start, end, grid=None):
+def generate_line(start=np.array([0, 0, 0.5]), end=np.array([2, 0, 0.5]), grid=None):
     """Generate a straight line trajectory."""
     if grid is None:
         grid = np.linspace(0, 1, 2)
@@ -34,8 +34,10 @@ def generate_line(start, end, grid=None):
     return waypoints
 
 
-def generate_random_walk(start, step_size, grid):
+def generate_random_walk(start=np.array([0, 0, 0.5]), step_size=0.5, grid=None):
     """Generate a random walk trajectory."""
+    if grid is None:
+        grid = np.linspace(0, 1, 20)
     waypoints = [start]
     for _ in range(1, grid.shape[0]):
         step = np.random.uniform(-step_size, step_size, size=3)
@@ -43,25 +45,23 @@ def generate_random_walk(start, step_size, grid):
     return np.stack(waypoints, axis=0)
 
 
-def generate_waypoints(traj='ellipse', height=0.5, loops=5, N=20, folder=''):
+def generate_waypoints(traj='ellipse', height=0.5, length=2.0, loops=5, N=20, folder=''):
     grid = np.linspace(0, 1, N + 1)  # points for traj
 
     if traj == 'ellipse':
         waypoints = generate_ellipse(
-            r_A=0.6, r_B=0.3, height=height, grid=grid)
+            r_A=length / 2, r_B=length / 4, height=height, grid=grid)
     elif traj == 'figure8':
         waypoints = generate_figure8(
-            r_A=0.6, r_B=0.6, height=height, grid=grid)
+            r_A=length, r_B=length, height=height, grid=grid)
     elif traj == 'random':
-        start = np.array([0, 0, height])
-        step_size = 0.5
         waypoints = generate_random_walk(
-            start=start, step_size=step_size, grid=grid)
+            start=np.array([0, 0, height]), step_size=0.5, grid=grid)
     elif traj == 'line':  # straight line
         start = np.array([0, 0, height])
-        goal = np.array([2, 0, height])
+        goal = np.array([length, 0, height])
         waypoints = generate_line(
-            start=start, end=goal, grid=grid)
+            start=start, end=goal, grid=None)  # only start and end points
     else:
         raise ValueError(f"Unknown traj type: {traj}")
 

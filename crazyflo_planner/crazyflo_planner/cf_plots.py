@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
-from pathlib import Path
 
 COLORS = ['r', 'g', 'b']
 
@@ -20,13 +19,17 @@ def plot_ocp(ocp_data: dict, constraints=False, animate=False, folder=None):
     pl_p_ref = ocp_data["pl_p_ref"]
     cable_l = ocp_data["cable_l"]
     cf_radius = ocp_data["cf_radius"]
+    obstacles = ocp_data["obstacles"]
 
     f_states, a_states = plot_states_cf(t, cf_p, cf_v, cf_a)
-    plot_states_pl(t, pl_p, pl_v, pl_p_ref,
-                   fig=f_states, axes=a_states)
+    # plot_states_pl(t, pl_p, pl_v, pl_p_ref,
+    #                fig=f_states, axes=a_states)
     if constraints:
         f_constr, a_constr = plot_constraints(cf_p, pl_p, cf_cable_t, cable_l)
     f_3d, a_3d = plot_3d(cf_p, pl_p, pl_p_ref, cf_radius)
+
+    if len(obstacles) > 0:
+        plot_obstacles(obstacles, fig=f_3d, axes=a_3d)
 
     set_3d_axis(fig=f_3d, axes=a_3d)
 
@@ -173,7 +176,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     pl_p = pl_p[:, :N]
 
     # cable tension
-    axes[0, 0].set_ylabel(f"Cable tension [N]")
+    axes[0, 0].set_ylabel("Cable tension [N]")
     axes[0, 0].set_xlabel("Time [s]")
     for i in range(3):
         axes[0, 0].plot(cf_cable_t[i, :], label=f"Drone {i+1}", color=COLORS[i])
@@ -185,7 +188,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     axes[0, 0].legend()
 
     # cable tension z component
-    axes[1, 0].set_ylabel(f"Cable tension z [N]")
+    axes[1, 0].set_ylabel("Cable tension z [N]")
     axes[1, 0].set_xlabel("Time [s]")
     for i in range(3):
         axes[1, 0].plot(
@@ -197,7 +200,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     axes[1, 0].legend()
 
     # cable angle
-    axes[0, 1].set_ylabel(f"Cable angle [deg]")
+    axes[0, 1].set_ylabel("Cable angle [deg]")
     axes[0, 1].set_xlabel("Time [s]")
     z_axis = np.array([0.0, 0.0, 1.0])
     for i in range(3):
@@ -209,7 +212,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
     axes[0, 1].legend()
 
     # drone collision
-    axes[1, 1].set_ylabel(f"Drone min distance [m]")
+    axes[1, 1].set_ylabel("Drone min distance [m]")
     axes[1, 1].set_xlabel("Time [s]")
     for i in range(3):
         pos_cf_cf = np.linalg.norm(cf_p[(i+1) % 3, :, :] - cf_p[i, :, :],
@@ -218,7 +221,7 @@ def plot_constraints(cf_p, pl_p, cf_cable_t, cable_l, fig=None, axes=None):
             pos_cf_cf,
             label=f"Drone {i+1} to Drone {(i+2)%3 +1}", color=COLORS[i])
     axes[1, 1].axhline(0.4, color='gray',
-                           linestyle='--', linewidth=1, label='min distance')
+                       linestyle='--', linewidth=1, label='min distance')
     axes[1, 1].grid(True)
     axes[1, 1].legend()
 
@@ -305,6 +308,17 @@ def set_3d_axis(fig, axes):
     fig.tight_layout()
 
 
+def plot_obstacles(obstacles, fig, axes):
+    """Plot obstacles as boxes on 3D axes."""
+
+    for obs in obstacles:
+        cx, cy, cz = obs["center"]
+        sx, sy, sz = obs["size"]
+        axes.bar3d(cx - sx/2, cy - sy/2, cz - sz/2,
+                   sx, sy, sz,
+                   color='gray', alpha=0.3, shade=True)
+
+
 def animate_ocp(ocp_data: dict):
     t = ocp_data["t"]
     interval = 100
@@ -333,6 +347,11 @@ def animate_ocp(ocp_data: dict):
 
     # cables
     cables = [ax.plot([], [], [], "k--")[0] for _ in range(3)]
+
+    # obstacles
+    obstacles = ocp_data.get("obstacles", [])
+    if len(obstacles) > 0:
+        plot_obstacles(obstacles, fig=fig, axes=ax)
 
     ax.legend()
     ax.set_xlabel("x")
@@ -436,9 +455,9 @@ def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5,
 
     plot_states_cf(
         t, cf_p, linestyle='--', fig=fig, axes=axes)
-    pl_p = get_pl_pose(cf_p, cable_l)
-    if pl_p.shape[1] > 1:
-        plot_states_pl(t, pl_p, linestyle='--', fig=fig, axes=axes)
+    # pl_p = get_pl_pose(cf_p, cable_l)
+    # if pl_p.shape[1] > 1:
+    #     plot_states_pl(t, pl_p, linestyle='--', fig=fig, axes=axes)
     plot_3d_cf(cf_p, linestyle='--', label_suffix=' (bag)', fig=fig_3d, axes=axes_3d)
     set_3d_axis(fig=fig_3d, axes=axes_3d)
 

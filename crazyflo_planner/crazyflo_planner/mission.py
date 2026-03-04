@@ -38,6 +38,7 @@ def main():
 
     traj_cfs = []
     for i in range(len(allcfs.crazyflies)):
+        print(f"loading trajectory for cf{i+1} from {csv_paths[i]}")
         traj_cfs.append(Trajectory())
         traj_cfs[i].loadcsv(csv_paths[i])
 

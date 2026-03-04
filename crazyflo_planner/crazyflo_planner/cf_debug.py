@@ -1,11 +1,7 @@
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 import numpy as np
 
 from pathlib import Path
 
-import cf_data
-import cf_plots
 
 ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
 PLOT_OCP = True
@@ -16,7 +12,7 @@ OFFSET_BAG = 0.0  # offset in seconds to align with ocp solution
 
 # Load OCP data
 ocp_path = ROOT_FOLDER / "data" / "ocp_solution.npz"
-ocp_data = np.load(ocp_path)
+ocp_data = np.load(ocp_path, allow_pickle=True)
 
 data_path = ROOT_FOLDER / "data"
 cf_name = ["cf1", "cf2", "cf3"]
