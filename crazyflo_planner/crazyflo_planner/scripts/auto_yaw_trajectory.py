@@ -39,7 +39,7 @@ def func_eq_constraint_der_value(coefficients, i, t, desired_value):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("trajectory", type=str, help="CSV file containing trajectory")
-    parser.add_argument("output", type=str, help="CSV file with updated yaw")
+    parser.add_argument("output", type=str, help="CSV file containing trajectory with updated yaw")
     parser.add_argument(
         "--num", type=int, default=20,
         help="number of sampled points per trajectory segment")
