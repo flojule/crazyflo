@@ -36,6 +36,7 @@ def solve_ocp(
     w_pl_vT: float = 0.1,  # terminal velocity weight
     w_pl_aT: float = 0.1,  # terminal acceleration weight
     w_cf_pT: float = 1.0,  # terminal position weight (formation)
+    w_obs: float = 1e9,  # obstacle avoidance weight
     obstacles: list = [],  # list of obstacles {'center', 'size'}
     dt_min: float = 0.05,  # minimum time step for variable time grid
     dt_max: float = 0.5,  # maximum time step for variable time grid
@@ -44,7 +45,7 @@ def solve_ocp(
     """Solve the 3-drone payload OCP."""
 
     N_wp = waypoints.shape[0]
-    
+
     M_max = 100
     M_min = max(N_wp, 10)
     path_length = float(np.sum(np.linalg.norm(np.diff(waypoints, axis=0), axis=1)))
@@ -57,8 +58,16 @@ def solve_ocp(
 
     wp_nodes = np.round(grid_wp * (M - 1)).astype(int)
 
-    pl_p_ref = np.vstack([
-        np.interp(grid_nodes, grid_wp, waypoints[:, dim]) for dim in range(3)])
+    if obstacles:
+        from scipy.interpolate import CubicSpline
+        t_wp = np.linspace(0, 1, N_wp)
+        cs = CubicSpline(t_wp, waypoints, bc_type='clamped')
+        pl_p_ref = cs(grid_nodes).T
+        pl_v_ref = cs(grid_nodes, 1).T
+    else:
+        pl_p_ref = np.vstack([
+            np.interp(grid_nodes, grid_wp, waypoints[:, dim]) for dim in range(3)])
+        pl_v_ref = np.gradient(pl_p_ref, dt_guess, axis=1)
 
     cf_p0 = get_drones_p0(cable_l, float(waypoints[0, 2]))
 
@@ -69,7 +78,6 @@ def solve_ocp(
     pl_p = opti.variable(3, M)  # payload positions
     pl_v = opti.variable(3, M)  # payload velocities
 
-    # cf_p = [opti.variable(3, M) for _ in range(3)]  # drone positions
     cf_v = [opti.variable(3, M) for _ in range(3)]  # drone velocities
     cf_a = [opti.variable(3, M - 1) for _ in range(3)]  # drone accelerations
     cf_cable_dir = [opti.variable(3, M) for _ in range(3)]  # unit cable directions
@@ -103,9 +111,6 @@ def solve_ocp(
 
     # Drones boundary conditions
     for i in range(3):
-        # opti.subject_to(cf_p_it(i, 0) == cf_p0[i])
-        # opti.subject_to(cf_p_it(i, 0)[2] == cf_p0[i][2])
-        # opti.subject_to(cf_p_it(i, M - 1)[2] == cf_p0[i][2])
         opti.subject_to(cf_v[i][:, 0] == ca.DM.zeros(3, 1))
         opti.subject_to(cf_v[i][:, M - 1] == ca.DM.zeros(3, 1))
         opti.subject_to(cf_a[i][:, 0] == ca.DM.zeros(3, 1))
@@ -165,6 +170,35 @@ def solve_ocp(
             opti.subject_to(cf_v[i][:, k + 1] == cf_v[i][:, k] + dt * cf_a[i][:, k])
             opti.subject_to((cf_p_it(i, k + 1) - cf_p_it(i, k)) == dt * cf_v[i][:, k])
 
+    # Obstacle avoidance
+    # def box_sdf(p, c, h):
+    #     """
+    #     Signed distance from point p to box (center c, half-sizes h).
+    #     Positive outside, zero on surface, negative inside.
+    #     """
+    #     q = ca.fabs(p - c) - h  # per-axis signed penetration
+
+    #     outside = ca.vertcat(ca.fmax(q[0], 0),
+    #                         ca.fmax(q[1], 0),
+    #                         ca.fmax(q[2], 0))
+
+    #     inside = ca.fmin(ca.fmax(ca.fmax(q[0], q[1]), q[2]), 0)
+
+    #     return ca.norm_2(outside) + inside
+
+    # for obs in obstacles:
+    #     c_obs = np.array(obs["center"])
+    #     h_cf = np.array(obs["size"]) / 2.0 + cf_radius
+    #     h_pl = np.array(obs["size"]) / 2.0 + pl_radius
+
+    #     for k in range(M):
+    #         # payload
+    #         opti.subject_to(box_sdf(pl_p[:, k], c_obs, h_pl) >= 0)
+
+    #         # drones
+    #         for i in range(3):
+    #             opti.subject_to(box_sdf(cf_p_it(i, k), c_obs, h_cf) >= 0)
+
     # ######### Cost function #########
     J = 0
 
@@ -216,33 +250,31 @@ def solve_ocp(
             J += w_dtension * ca.sumsqr(cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]) / dt
 
     # obstacle avoidance
-    w_obs = 1e6
-
-    def obs_penalty(p, c, s_half):
+    def obs_penalty(p, c_obs, l_obs):
         # Normalised penetration per axis in [0, 1]
-        pen_x = ca.fmax(s_half[0] - ca.fabs(p[0] - c[0]), 0) / s_half[0]
-        pen_y = ca.fmax(s_half[1] - ca.fabs(p[1] - c[1]), 0) / s_half[1]
-        pen_z = ca.fmax(s_half[2] - ca.fabs(p[2] - c[2]), 0) / s_half[2]
-        return (pen_x * pen_y * pen_z) ** 2
+        pen_x = ca.fmax(l_obs[0] - ca.fabs(p[0] - c_obs[0]), 0) / l_obs[0]
+        pen_y = ca.fmax(l_obs[1] - ca.fabs(p[1] - c_obs[1]), 0) / l_obs[1]
+        pen_z = ca.fmax(l_obs[2] - ca.fabs(p[2] - c_obs[2]), 0) / l_obs[2]
+        return (pen_x * pen_y * pen_z)
 
     for obs in obstacles:
-        c = np.array(obs["center"])
-        half_cf = np.array(obs["size"]) / 2.0 + cf_radius
-        half_pl = np.array(obs["size"]) / 2.0 + pl_radius
-        for k in range(M):
-            # payload
-            J += w_obs * obs_penalty(pl_p[:, k], c, half_pl)
-            # drones
-            for i in range(3):
-                J += w_obs * obs_penalty(cf_p_it(i, k), c, half_cf)
+        if "nogo" in obs:
+            c = np.array(obs["nogo"]["center"])
+            half_cf = np.array(obs["nogo"]["size"]) / 2.0 + cf_radius
+            half_pl = np.array(obs["nogo"]["size"]) / 2.0 + pl_radius
+            for k in range(M):
+                # payload
+                J += w_obs * obs_penalty(pl_p[:, k], c, half_pl)
+                # drones
+                for i in range(3):
+                    J += w_obs * obs_penalty(cf_p_it(i, k), c, half_cf)
 
     opti.minimize(J)
 
     # ######### Initial guess #########
     opti.set_initial(dt, dt_guess)
     opti.set_initial(pl_p, pl_p_ref)
-    pl_v_guess = np.gradient(pl_p_ref, dt_guess, axis=1)
-    opti.set_initial(pl_v, pl_v_guess)
+    opti.set_initial(pl_v, pl_v_ref)
 
     base_dirs = np.zeros((3, 3))
     for i in range(3):
@@ -256,11 +288,11 @@ def solve_ocp(
         "tol": 1e-4,
         "acceptable_tol": 1e-3,
         "acceptable_iter": 5,
-        # "linear_solver": "mumps",
+        "linear_solver": "mumps",
         "nlp_scaling_method": "gradient-based",
         "mu_strategy": "adaptive",
         "print_level": 1,
-        "warm_start_init_point": "yes",
+        # "warm_start_init_point": "no",
     }
     p_opts = {"expand": True}
     opti.solver("ipopt", p_opts, s_opts)

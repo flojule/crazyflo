@@ -21,28 +21,30 @@ PLOT_OCP = True
 if __name__ == "__main__":
     trajs = ['line', 'ellipse', 'figure8', 'random']
     traj = trajs[0]
-    obstacles_types = [None, 'vertical_passage', 'horizontal_passage', 'course']
-    obstacles_type = obstacles_types[3]
-    gap = 0.5  # gap size for obstacles in m
+    obstacles_types = [None, 'wall', 'vertical_passage', 'horizontal_passage', 'course']
+    obstacles_type = obstacles_types[-1]
+    gap = 1.0  # gap size for obstacles in m
     length = 10.0  # length of obstacle course in m
 
     pl_height = 0.5  # payload height in m
     cable_l = 0.5  # cable lengths
-    cf_v_max, cf_a_max = 2.0, 5.0  # cf max velocity and acceleration
+    cf_v_max, cf_a_max = 3.0, 8.0  # cf max velocity and acceleration
+
+    # generate pl_waypoints and save to csv
+    waypoints = cf_waypoints.generate_waypoints(
+        traj=traj, height=pl_height, length=length, N=10, folder=data_folder)
 
     # obstacles
     if obstacles_type is None or traj != 'line':
         obstacles = []  # only add obstacles for non-line trajs
     else:
         obstacles = cf_obstacles.get_obstacles(obstacles_type, gap=gap, length=length)
-
-    # generate pl_waypoints and save to csv
-    pl_waypoints = cf_waypoints.generate_waypoints(
-        traj=traj, height=pl_height, length=length, N=10, folder=data_folder)
+        if obstacles_type is not None and obstacles_type != 'wall':
+            waypoints = cf_obstacles.update_waypoints(waypoints, obstacles)
 
     # solve OCP for crazyflie trajectories
     sol = cf_solver.solve_ocp(
-        waypoints=pl_waypoints,
+        waypoints=waypoints,
         cable_l=cable_l,
         cf_v_max=cf_v_max,
         cf_a_max=cf_a_max,

@@ -312,11 +312,12 @@ def plot_obstacles(obstacles, fig, axes):
     """Plot obstacles as boxes on 3D axes."""
 
     for obs in obstacles:
-        cx, cy, cz = obs["center"]
-        sx, sy, sz = obs["size"]
-        axes.bar3d(cx - sx/2, cy - sy/2, cz - sz/2,
-                   sx, sy, sz,
-                   color='gray', alpha=0.3, shade=True)
+        if "nogo" in obs:
+            cx, cy, cz = obs["nogo"]["center"]
+            sx, sy, sz = obs["nogo"]["size"]
+            axes.bar3d(cx - sx/2, cy - sy/2, cz - sz/2,
+                       sx, sy, sz,
+                       color='gray', alpha=0.3, shade=True)
 
 
 def animate_ocp(ocp_data: dict):
