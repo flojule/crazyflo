@@ -67,9 +67,9 @@ def create_horizontal_passage(list=[], gap=0.5, x=5.0, y=0.0, z=0.0):
 
 def create_course(list=[], gap=0.5, length=2.0, height=0.5):
     """Create a course with multiple vertical and horizontal passages."""
-    list = create_vertical_passage(list, gap=gap, x=length*1/3, y=1.0, z=height)
-    list = create_horizontal_passage(list, gap=gap, x=length/2, y=0.0, z=height)
-    list = create_vertical_passage(list, gap=gap, x=length*2/3, y=-1.0, z=height)
+    list = create_vertical_passage(list, gap=gap, x=length*1/4, y=1.0, z=height)
+    list = create_horizontal_passage(list, gap=gap, x=length*2/4, y=0.0, z=height)
+    list = create_vertical_passage(list, gap=gap, x=length*3/4, y=-1.0, z=height)
     return list
 
 

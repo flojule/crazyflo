@@ -5,6 +5,7 @@
 
 import numpy as np
 import casadi as ca
+from scipy.interpolate import CubicSpline
 
 
 def solve_ocp(
@@ -20,8 +21,8 @@ def solve_ocp(
     cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
     pl_radius: float = 0.05,  # payload radius for obstacle avoidance in m
     w_T: float = 1.0,  # time weight
-    w_pl_p: float = 100.0,  # position weight
-    w_pl_v: float = 0.01,  # velocity weight
+    w_pl_p: float = 1e3,  # position weight
+    w_pl_v: float = 1.0,  # velocity weight
     w_pl_a: float = 0.001,  # acceleration weight
     w_pl_j: float = 0.01,  # jerk weight
     w_pl_s: float = 0.01,  # snap weight
@@ -32,14 +33,14 @@ def solve_ocp(
     w_cf_s: float = 0.01,  # snap weight
     w_tension: float = 0.001,  # tension weight
     w_dtension: float = 0.0001,  # tension change weight
-    w_pl_pT: float = 100.0,  # terminal position weight
+    w_pl_pT: float = 1.0,  # terminal position weight
     w_pl_vT: float = 0.1,  # terminal velocity weight
     w_pl_aT: float = 0.1,  # terminal acceleration weight
     w_cf_pT: float = 1.0,  # terminal position weight (formation)
-    w_obs: float = 1e9,  # obstacle avoidance weight
+    w_obs: float = 1e2,  # obstacle avoidance weight
     obstacles: list = [],  # list of obstacles {'center', 'size'}
     dt_min: float = 0.05,  # minimum time step for variable time grid
-    dt_max: float = 0.5,  # maximum time step for variable time grid
+    dt_max: float = 0.2,  # maximum time step for variable time grid
     dt_guess: float = 0.1,  # initial guess for time step
 ) -> dict:
     """Solve the 3-drone payload OCP."""
@@ -51,7 +52,6 @@ def solve_ocp(
     path_length = float(np.sum(np.linalg.norm(np.diff(waypoints, axis=0), axis=1)))
     segment_length = cf_v_max * dt_max * 0.5
     M = int(np.clip(round(path_length / segment_length), M_min, M_max))
-    print(f"\nOCP: path_length={path_length:.2f} m, solving with {M} segments\n")
     M = max(M, N_wp)
     grid_wp = np.linspace(0, 1, N_wp)
     grid_nodes = np.linspace(0, 1, M)
@@ -59,7 +59,6 @@ def solve_ocp(
     wp_nodes = np.round(grid_wp * (M - 1)).astype(int)
 
     if obstacles:
-        from scipy.interpolate import CubicSpline
         t_wp = np.linspace(0, 1, N_wp)
         cs = CubicSpline(t_wp, waypoints, bc_type='clamped')
         pl_p_ref = cs(grid_nodes).T
@@ -68,6 +67,8 @@ def solve_ocp(
         pl_p_ref = np.vstack([
             np.interp(grid_nodes, grid_wp, waypoints[:, dim]) for dim in range(3)])
         pl_v_ref = np.gradient(pl_p_ref, dt_guess, axis=1)
+
+    print(f"\nPath length = {path_length:.2f} m, N = {N_wp}, M = {M}, dt_guess = {dt_guess:.2f} s\n")
 
     cf_p0 = get_drones_p0(cable_l, float(waypoints[0, 2]))
 
@@ -170,35 +171,6 @@ def solve_ocp(
             opti.subject_to(cf_v[i][:, k + 1] == cf_v[i][:, k] + dt * cf_a[i][:, k])
             opti.subject_to((cf_p_it(i, k + 1) - cf_p_it(i, k)) == dt * cf_v[i][:, k])
 
-    # Obstacle avoidance
-    # def box_sdf(p, c, h):
-    #     """
-    #     Signed distance from point p to box (center c, half-sizes h).
-    #     Positive outside, zero on surface, negative inside.
-    #     """
-    #     q = ca.fabs(p - c) - h  # per-axis signed penetration
-
-    #     outside = ca.vertcat(ca.fmax(q[0], 0),
-    #                         ca.fmax(q[1], 0),
-    #                         ca.fmax(q[2], 0))
-
-    #     inside = ca.fmin(ca.fmax(ca.fmax(q[0], q[1]), q[2]), 0)
-
-    #     return ca.norm_2(outside) + inside
-
-    # for obs in obstacles:
-    #     c_obs = np.array(obs["center"])
-    #     h_cf = np.array(obs["size"]) / 2.0 + cf_radius
-    #     h_pl = np.array(obs["size"]) / 2.0 + pl_radius
-
-    #     for k in range(M):
-    #         # payload
-    #         opti.subject_to(box_sdf(pl_p[:, k], c_obs, h_pl) >= 0)
-
-    #         # drones
-    #         for i in range(3):
-    #             opti.subject_to(box_sdf(cf_p_it(i, k), c_obs, h_cf) >= 0)
-
     # ######### Cost function #########
     J = 0
 
@@ -209,6 +181,7 @@ def solve_ocp(
     for j in range(1, N_wp - 1):
         k = int(wp_nodes[j])
         J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(waypoints[j]))
+        J += w_pl_v * ca.sumsqr(pl_v[:, k])
 
     # payload smoothness (jerk + snap)
     for k in range(M - 2):
@@ -222,7 +195,7 @@ def solve_ocp(
             J += w_pl_s * ca.sumsqr(j_k1 - j_k) * dt
 
     # payload terminal cost
-    J += w_pl_pT * ca.sumsqr(pl_p[:, M - 1] - ca.DM(waypoints[-1]))
+    # J += w_pl_pT * ca.sumsqr(pl_p[:, M - 1] - ca.DM(waypoints[-1]))
     J += w_pl_vT * ca.sumsqr(pl_v[:, M - 1])
     J += w_pl_aT * ca.sumsqr((pl_v[:, M - 1] - pl_v[:, M - 2]) / dt)
 
@@ -249,13 +222,10 @@ def solve_ocp(
         for k in range(M - 1):
             J += w_dtension * ca.sumsqr(cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]) / dt
 
-    # obstacle avoidance
-    def obs_penalty(p, c_obs, l_obs):
-        # Normalised penetration per axis in [0, 1]
-        pen_x = ca.fmax(l_obs[0] - ca.fabs(p[0] - c_obs[0]), 0) / l_obs[0]
-        pen_y = ca.fmax(l_obs[1] - ca.fabs(p[1] - c_obs[1]), 0) / l_obs[1]
-        pen_z = ca.fmax(l_obs[2] - ca.fabs(p[2] - c_obs[2]), 0) / l_obs[2]
-        return (pen_x * pen_y * pen_z)
+    def log_barrier(p, c_obs, l_obs, d_safe=1e-6, eps=1e-6):
+        gap = ca.fabs(p - c_obs) - l_obs
+        cost = -ca.log(ca.fmax(gap/d_safe, eps)) / (-ca.log(eps)*3)  # 1 at gap=0
+        return ca.sum1(cost)
 
     for obs in obstacles:
         if "nogo" in obs:
@@ -264,10 +234,12 @@ def solve_ocp(
             half_pl = np.array(obs["nogo"]["size"]) / 2.0 + pl_radius
             for k in range(M):
                 # payload
-                J += w_obs * obs_penalty(pl_p[:, k], c, half_pl)
+                J += w_obs * log_barrier(
+                    pl_p[:, k], c, half_pl)
                 # drones
                 for i in range(3):
-                    J += w_obs * obs_penalty(cf_p_it(i, k), c, half_cf)
+                    J += w_obs * log_barrier(
+                        cf_p_it(i, k), c, half_cf)
 
     opti.minimize(J)
 
@@ -292,7 +264,7 @@ def solve_ocp(
         "nlp_scaling_method": "gradient-based",
         "mu_strategy": "adaptive",
         "print_level": 1,
-        # "warm_start_init_point": "no",
+        "warm_start_init_point": "yes",
     }
     p_opts = {"expand": True}
     opti.solver("ipopt", p_opts, s_opts)

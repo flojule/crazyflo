@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     pl_height = 0.5  # payload height in m
     cable_l = 0.5  # cable lengths
-    cf_v_max, cf_a_max = 3.0, 8.0  # cf max velocity and acceleration
+    cf_v_max, cf_a_max = 2.0, 5.0  # cf max velocity and acceleration
 
     # generate pl_waypoints and save to csv
     waypoints = cf_waypoints.generate_waypoints(
