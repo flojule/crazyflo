@@ -20,6 +20,7 @@ def plot_ocp(ocp_data: dict, constraints=False, animate=False, folder=None):
     cable_l = ocp_data["cable_l"]
     cf_radius = ocp_data["cf_radius"]
     obstacles = ocp_data["obstacles"]
+    waypoints = ocp_data["waypoints"]
 
     f_states, a_states = plot_states_cf(t, cf_p, cf_v, cf_a)
     # plot_states_pl(t, pl_p, pl_v, pl_p_ref,
@@ -633,3 +634,30 @@ def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float):
     p2 = x0 + t2 * v
 
     return p1 if p1[2] <= p2[2] else p2
+
+
+def plot_cost(ocp_data):
+    """Plot cost history from OCP optimization."""
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+    cost = ocp_data["cost"]
+    cost_obs = ocp_data["cost_obs"]
+    time = ocp_data["t"]
+    obstacles = ocp_data["obstacles"]
+
+    if obstacles is not None and len(obstacles) > 0:
+        passage_obs = [obs for obs in obstacles if "passage" in obs]
+        if len(passage_obs) > 0:
+            x_pl = ocp_data["pl_p"][0, :]
+            for i, obs in enumerate(passage_obs):
+                x_obs = obs["passage"]["center"][0]
+                nearest_idx = np.argmin(np.abs(x_pl - x_obs))
+                ax.axvline(x=time[nearest_idx], color='r', linestyle='--', alpha=0.5,
+                           label='passage' if i == 0 else None)
+
+    ax.plot(time, cost, label="Total cost")
+    ax.plot(time, cost_obs, label="Obstacle cost")
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Cost")
+    ax.grid(True)
+    fig.tight_layout()
+    return fig, ax

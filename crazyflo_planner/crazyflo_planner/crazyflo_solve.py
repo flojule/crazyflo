@@ -23,7 +23,7 @@ if __name__ == "__main__":
     traj = trajs[0]
     obstacles_types = [None, 'wall', 'vertical_passage', 'horizontal_passage', 'course']
     obstacles_type = obstacles_types[-1]
-    gap = 1.0  # gap size for obstacles in m
+    gap = 0.6  # gap size for obstacles in m
     length = 10.0  # length of obstacle course in m
 
     pl_height = 0.5  # payload height in m
@@ -61,6 +61,7 @@ if __name__ == "__main__":
 
     # plot OCP solution and animate
     if PLOT_OCP:
+        cf_plots.plot_cost(sol)
         f_states, a_states, f_constr, a_constr, f_3d, a_3d = cf_plots.plot_ocp(
             sol, animate=True, folder=plot_folder)
         plt.show()

@@ -20,24 +20,24 @@ def solve_ocp(
     tension_max: float = 0.15,  # max tension in N
     cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
     pl_radius: float = 0.05,  # payload radius for obstacle avoidance in m
-    w_T: float = 1.0,  # time weight
-    w_pl_p: float = 1e3,  # position weight
-    w_pl_v: float = 1.0,  # velocity weight
-    w_pl_a: float = 0.001,  # acceleration weight
-    w_pl_j: float = 0.01,  # jerk weight
-    w_pl_s: float = 0.01,  # snap weight
-    w_cf_p: float = 0.001,  # position weight
-    w_cf_v: float = 0.001,  # velocity weight
-    w_cf_a: float = 0.001,  # acceleration weight
-    w_cf_j: float = 0.1,  # jerk weight
-    w_cf_s: float = 0.01,  # snap weight
-    w_tension: float = 0.001,  # tension weight
-    w_dtension: float = 0.0001,  # tension change weight
-    w_pl_pT: float = 1.0,  # terminal position weight
-    w_pl_vT: float = 0.1,  # terminal velocity weight
-    w_pl_aT: float = 0.1,  # terminal acceleration weight
-    w_cf_pT: float = 1.0,  # terminal position weight (formation)
-    w_obs: float = 1e2,  # obstacle avoidance weight
+    w_T: float = 1e0,  # time weight
+    w_pl_p: float = 1e6,  # position weight
+    w_pl_v: float = 1e0,  # velocity weight
+    w_pl_a: float = 1e0,  # acceleration weight
+    w_pl_j: float = 1e0,  # jerk weight
+    w_pl_s: float = 1e0,  # snap weight
+    w_cf_p: float = 1e0,  # position weight
+    w_cf_v: float = 1e0,  # velocity weight
+    w_cf_a: float = 1e0,  # acceleration weight
+    w_cf_j: float = 1e0,  # jerk weight
+    w_cf_s: float = 1e0,  # snap weight
+    w_tension: float = 1e0,  # tension weight
+    w_dtension: float = 1e-3,  # tension change weight
+    w_pl_pT: float = 1e0,  # terminal position weight
+    w_pl_vT: float = 1e0,  # terminal velocity weight
+    w_pl_aT: float = 1e0,  # terminal acceleration weight
+    w_cf_pT: float = 1e0,  # terminal position weight (formation)
+    w_obs: float = 1e3,  # obstacle avoidance weight
     obstacles: list = [],  # list of obstacles {'center', 'size'}
     dt_min: float = 0.05,  # minimum time step for variable time grid
     dt_max: float = 0.2,  # maximum time step for variable time grid
@@ -173,9 +173,12 @@ def solve_ocp(
 
     # ######### Cost function #########
     J = 0
+    J_k = [ca.MX(0) for _ in range(M)]  # for debugging and plotting cost terms over time
+    J_obs = [ca.MX(0) for _ in range(M)]
 
     # time cost
     J += w_T * (M - 1) * dt  # total time
+    J_k = [w_T * dt for _ in range(M)]  # evenly distribute time cost to all steps
 
     # waypoints soft constraints
     for j in range(1, N_wp - 1):
@@ -183,48 +186,69 @@ def solve_ocp(
         J += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(waypoints[j]))
         J += w_pl_v * ca.sumsqr(pl_v[:, k])
 
+        J_k[k] += w_pl_p * ca.sumsqr(pl_p[:, k] - ca.DM(waypoints[j]))
+        J_k[k] += w_pl_v * ca.sumsqr(pl_v[:, k])
+
     # payload smoothness (jerk + snap)
     for k in range(M - 2):
         pl_a_k = (pl_v[:, k + 1] - pl_v[:, k]) / dt
         pl_a_k1 = (pl_v[:, k + 2] - pl_v[:, k + 1]) / dt
         j_k = (pl_a_k1 - pl_a_k) / dt
         J += w_pl_j * ca.sumsqr(j_k) * dt
+        J_k[k] += w_pl_j * ca.sumsqr(j_k) * dt
         if k < M - 3:
             pl_a_k2 = (pl_v[:, k + 3] - pl_v[:, k + 2]) / dt
             j_k1 = (pl_a_k2 - pl_a_k1) / dt
             J += w_pl_s * ca.sumsqr(j_k1 - j_k) * dt
+            J_k[k] += w_pl_s * ca.sumsqr(j_k1 - j_k) * dt
 
     # payload terminal cost
     # J += w_pl_pT * ca.sumsqr(pl_p[:, M - 1] - ca.DM(waypoints[-1]))
     J += w_pl_vT * ca.sumsqr(pl_v[:, M - 1])
     J += w_pl_aT * ca.sumsqr((pl_v[:, M - 1] - pl_v[:, M - 2]) / dt)
 
+    # J_k[M - 1] += w_pl_pT * ca.sumsqr(pl_p[:, M - 1] - ca.DM(waypoints[-1]))
+    J_k[M - 1] += w_pl_vT * ca.sumsqr(pl_v[:, M - 1])
+    J_k[M - 1] += w_pl_aT * ca.sumsqr((pl_v[:, M - 1] - pl_v[:, M - 2]) / dt)
+
     # cf terminal cost
     cf_p0_T = get_drones_p0(cable_l, float(waypoints[-1, 2]))
     base_dirs_T = np.array([(cf_p0_T[i] - waypoints[-1]) / cable_l for i in range(3)])
     for i in range(3):
         J += w_cf_pT * ca.sumsqr(cf_cable_dir[i][:, M - 1] - ca.DM(base_dirs_T[i]))
+        J_k[M - 1] += w_cf_pT * ca.sumsqr(cf_cable_dir[i][:, M - 1] - ca.DM(base_dirs_T[i]))
 
     # cf smoothness
     for i in range(3):
         for k in range(M - 2):
             J += w_cf_j * ca.sumsqr(cf_a[i][:, k + 1] - cf_a[i][:, k]) / dt
+            J_k[k] += w_cf_j * ca.sumsqr(cf_a[i][:, k + 1] - cf_a[i][:, k]) / dt
         for k in range(M - 3):
             j_k = (cf_a[i][:, k + 1] - cf_a[i][:, k]) / dt
             j_k1 = (cf_a[i][:, k + 2] - cf_a[i][:, k + 1]) / dt
             J += w_cf_s * ca.sumsqr(j_k1 - j_k) / dt
+            J_k[k] += w_cf_s * ca.sumsqr(j_k1 - j_k) / dt
 
     # cable tension
     for k in range(M):
         t1, t2, t3 = cf_cable_t[0][:, k], cf_cable_t[1][:, k], cf_cable_t[2][:, k]
         J += w_tension * (ca.sumsqr(t1 - t2) + ca.sumsqr(t2 - t3) + ca.sumsqr(t3 - t1)) * dt
+        J_k[k] += w_tension * (ca.sumsqr(t1 - t2) + ca.sumsqr(t2 - t3) + ca.sumsqr(t3 - t1)) * dt
     for i in range(3):
         for k in range(M - 1):
             J += w_dtension * ca.sumsqr(cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]) / dt
+            J_k[k] += w_dtension * ca.sumsqr(cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]) / dt
 
-    def log_barrier(p, c_obs, l_obs, d_safe=1e-6, eps=1e-6):
+    def log_barrier(p, c_obs, l_obs, d_safe=0.1, eps=1e-6):
+        gap = (ca.fabs(p - c_obs) - l_obs) / d_safe  # distance to box surface, normalized
+        t = ca.fmax(ca.fmin(gap, 1.0), 0.0)  # normalized gap with lower bound
+        w = 1.0 - t**3 * (10 - 15*t + 6*t**2)  # tangent continuous smooth weight
+        cost = -ca.log(ca.fmax(gap, eps)) / (-ca.log(eps))  # 1 at gap=0
+        return ca.sum1(w*cost) - 2.0
+
+    def quadratic_barrier(p, c_obs, l_obs, d_safe=1e-6, eps=1e-6):
         gap = ca.fabs(p - c_obs) - l_obs
-        cost = -ca.log(ca.fmax(gap/d_safe, eps)) / (-ca.log(eps)*3)  # 1 at gap=0
+        cost = (gap / d_safe) ** 2  # 1 at gap=d_safe, 0 at gap=0
         return ca.sum1(cost)
 
     for obs in obstacles:
@@ -236,9 +260,17 @@ def solve_ocp(
                 # payload
                 J += w_obs * log_barrier(
                     pl_p[:, k], c, half_pl)
+                J_k[k] += w_obs * log_barrier(
+                    pl_p[:, k], c, half_pl)
+                J_obs[k] += w_obs * log_barrier(
+                    pl_p[:, k], c, half_pl)
                 # drones
                 for i in range(3):
                     J += w_obs * log_barrier(
+                        cf_p_it(i, k), c, half_cf)
+                    J_k[k] += w_obs * log_barrier(
+                        cf_p_it(i, k), c, half_cf)
+                    J_obs[k] += w_obs * log_barrier(
                         cf_p_it(i, k), c, half_cf)
 
     opti.minimize(J)
@@ -280,6 +312,8 @@ def solve_ocp(
     cf_cable_dir_sol = [sol.value(cf_cable_dir[i]) for i in range(3)]
     cf_cable_t_sol = [sol.value(cf_cable_t[i]) for i in range(3)]
     cf_p_sol = [pl_p_sol + cable_l * cf_cable_dir_sol[i] for i in range(3)]
+    cost_sol = np.array([float(sol.value(J_k[k])) for k in range(M)])
+    cost_obs_sol = np.array([float(sol.value(J_obs[k])) for k in range(M)])
 
     # print for debugging
     print(f"\nOCP solution: dt: {dt_sol:.4f} s,  T_total: {t_grid[-1]:.2f} s\n")
@@ -301,6 +335,9 @@ def solve_ocp(
         "cable_l": cable_l,
         "cf_radius": cf_radius,
         "obstacles": obstacles,
+        "cost": cost_sol,
+        "cost_obs": cost_obs_sol,
+        "waypoints": waypoints
     }
 
 

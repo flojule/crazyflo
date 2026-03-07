@@ -15,7 +15,7 @@ BAGS_FOLDER = ROOT_FOLDER / "bags"
 plot_folder = ROOT_FOLDER / "figures"
 plot_folder.mkdir(parents=True, exist_ok=True)
 
-PLOT, PLOT_ANIMATE, PLOT_BAG = 1, 1, 0
+PLOT, PLOT_ANIMATE, PLOT_BAG = 0, 0, 0
 
 
 if __name__ == "__main__":
@@ -70,5 +70,7 @@ if __name__ == "__main__":
 
 
     # cf_plots.save_plots(f_states, f_constr, f_3d, plot_folder)
+
+    cf_plots.plot_cost(ocp_sol)
 
     plt.show()
