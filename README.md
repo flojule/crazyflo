@@ -20,19 +20,14 @@ See [crazyflo_planner/README.md](crazyflo_planner/README.md) for the full module
 ## Quick start
 
 ```bash
-# 1 — Source ROS 2 and the workspace
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-source ~/winter-project/venvs/crazyswarm2/bin/activate
-
-# 2 — Plan trajectories (offline, no drones needed)
+# 1 — Plan trajectories (offline, no drones needed)
 cd crazyflo_planner/crazyflo_planner
 python crazyflo_solve.py
 
-# 3 — Launch simulation
+# 2 — Launch simulation
 ros2 launch crazyflo_planner sim.launch.xml
 
-# 4 — Or launch on real drones + run the mission script
+# 3 — Or launch on real drones + run the mission script
 ros2 launch crazyflo_planner real.launch.xml
 ros2 run crazyflo_planner mission
 ```
