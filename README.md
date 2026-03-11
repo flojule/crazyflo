@@ -1,5 +1,7 @@
 # crazyflo
 
+[Watch the demo video](https://github.com/user-attachments/assets/08495a9e-1ff6-4af9-ac21-35a55d5e8173)
+
 Cooperative payload transport with a swarm of three [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones connected to a shared payload via cables.
 
 ## What it does
