@@ -6,7 +6,19 @@ Cooperative payload transport with a swarm of three [Crazyflie](https://www.bitc
 
 ## What it does
 
-Three drones fly in formation, each attached to the same payload by a cable. An **Optimal Control Problem (OCP)** is solved offline to generate dynamically feasible, collision-free trajectories for all drones simultaneously. The resulting trajectories are uploaded to the firmware and executed in a button-gated sequence (takeoff → align → fly → land).
+Three drones fly in formation, each attached to the same payload by a cable. An **Optimal Control Problem (OCP)** is solved offline to generate dynamically feasible, collision-free trajectories for all drones simultaneously. The resulting trajectories are uploaded to the firmware and executed.
+
+### Figure-8
+
+| Animation | States (altitude / speed / acceleration) |
+|:---:|:---:|
+| ![figure8 animation](crazyflo_planner/figures/figure8/animation.gif) | ![figure8 states](crazyflo_planner/figures/figure8/cf_plot.png) |
+
+### Ellipse
+
+| Animation | States (altitude / speed / acceleration) |
+|:---:|:---:|
+| ![ellipse animation](crazyflo_planner/figures/ellipse/animation.gif) | ![ellipse states](crazyflo_planner/figures/ellipse/cf_plot.png) |
 
 ## Repository layout
 
@@ -31,6 +43,8 @@ ros2 launch crazyflo_planner sim.launch.xml
 ros2 launch crazyflo_planner real.launch.xml
 ros2 run crazyflo_planner mission
 ```
+
+---
 
 ## Key dependencies
 
