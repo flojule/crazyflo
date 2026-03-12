@@ -24,12 +24,6 @@ setup(
             'config/sim.yaml',
             'config/crazyflo.yaml',
         ]),
-        ('share/' + package_name + '/data', [
-            'data/figure8.csv',
-            'data/traj_cf1.csv',
-            'data/traj_cf2.csv',
-            'data/traj_cf3.csv',
-        ]),
         ('share/' + package_name + '/urdf', [
             'urdf/cf2_assembly_with_props.dae',
             'urdf/cf2_assembly.stl',
@@ -50,8 +44,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'payload_sim = crazyflo_planner.payload_sim:main',
-            'mission = crazyflo_planner.mission:main',
+            'sim = crazyflo_planner.crazyflo_sim:main',
+            'mission = crazyflo_planner.crazyflo_mission:main',
         ],
         
     },

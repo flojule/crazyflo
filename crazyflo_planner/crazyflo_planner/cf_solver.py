@@ -19,6 +19,7 @@ def solve_ocp(
     tension_min: float = 0.05,  # min tension in N
     tension_max: float = 0.15,  # max tension in N
     cf_radius: float = 0.2,  # crazyflie radius for drone-drone collision in m
+    cf_obs_radius: float = 0.1,  # crazyflie body radius for obstacle clearance in m
     pl_radius: float = 0.05,  # payload radius for obstacle avoidance in m
     w_T: float = 1e0,  # time weight
     w_pl_p: float = 1e6,  # position weight
@@ -49,14 +50,19 @@ def solve_ocp(
 
     N_wp = waypoints.shape[0]
 
-    M_max = 100
+    M_max = 300
     M_min = max(N_wp, 10)
     path_length = float(np.sum(np.linalg.norm(np.diff(waypoints, axis=0), axis=1)))
-    segment_length = cf_v_max * dt_max * 0.5
+    # Target dt_min per segment so the grid is fine enough to resolve tight passages.
+    # With obstacles present use an even finer grid (dt_min), otherwise dt_max is enough.
+    target_dt = dt_min if obstacles else dt_max
+    segment_length = cf_v_max * target_dt
     M = int(np.clip(round(path_length / segment_length), M_min, M_max))
     M = max(M, N_wp)
     grid_wp = np.linspace(0, 1, N_wp)
     grid_nodes = np.linspace(0, 1, M)
+    # Initial dt guess: spread path evenly at half max speed
+    dt_guess = float(np.clip(path_length / (cf_v_max * (M - 1)), dt_min, dt_max * 0.9))
 
     wp_nodes = np.round(grid_wp * (M - 1)).astype(int)
 
@@ -70,7 +76,7 @@ def solve_ocp(
             np.interp(grid_nodes, grid_wp, waypoints[:, dim]) for dim in range(3)])
         pl_v_ref = np.gradient(pl_p_ref, dt_guess, axis=1)
 
-    print(f"\nPath length = {path_length:.2f} m, N = {N_wp}, M = {M}, dt_guess = {dt_guess:.2f} s\n")
+    print(f"\nPath length = {path_length:.2f} m, N = {N_wp}, M = {M}, dt_guess = {dt_guess:.3f} s\n")
 
     cf_p0 = get_drones_p0(cable_l, float(waypoints[0, 2]))
 
@@ -101,15 +107,23 @@ def solve_ocp(
     opti.subject_to(pl_v[:, 0] == ca.DM.zeros(3, 1))
     opti.subject_to(pl_v[:, M - 1] == ca.DM.zeros(3, 1))
 
-    # enforce static equilibrium at k=0 and k=M-1
+    # Static equilibrium: kept as soft penalty (moved to cost below)
     def sum_tension_vec(k: int):
         s = ca.MX.zeros(3, 1)
         for i in range(3):
             s += cf_cable_t[i][0, k] * cf_cable_dir[i][:, k]
         return s
 
-    for k in [0, M-1]:
-        opti.subject_to(sum_tension_vec(k) == ca.DM([0.0, 0.0, pl_mass * g]))
+    # Drone formation at start and end: fix cable directions to the nominal
+    # equilateral-triangle formation so the drones begin and finish in formation.
+    cf_p0_end = get_drones_p0(cable_l, float(waypoints[-1, 2]))
+    for i in range(3):
+        dir_start = np.array(cf_p0[i] - waypoints[0]) / cable_l
+        dir_start /= np.linalg.norm(dir_start)
+        dir_end = np.array(cf_p0_end[i] - waypoints[-1]) / cable_l
+        dir_end /= np.linalg.norm(dir_end)
+        opti.subject_to(cf_cable_dir[i][:, 0] == ca.DM(dir_start))
+        opti.subject_to(cf_cable_dir[i][:, M - 1] == ca.DM(dir_end))
 
     # Drones boundary conditions
     for i in range(3):
@@ -134,11 +148,13 @@ def solve_ocp(
         opti.subject_to(ca.sumsqr(d2) >= (cf_radius*2) ** 2)
         opti.subject_to(ca.sumsqr(d3) >= (cf_radius*2) ** 2)
 
-    # Drones cable tension limits and unit directions
+    # Cable unit-norm: hard equality
     for i in range(3):
         for k in range(M):
-            d = cf_cable_dir[i][:, k]
-            opti.subject_to(ca.sumsqr(d) == 1.0)
+            opti.subject_to(ca.sumsqr(cf_cable_dir[i][:, k]) == 1.0)
+
+    # Drones cable tension limits
+    for i in range(3):
         opti.subject_to(cf_cable_t[i] >= tension_min)
         opti.subject_to(cf_cable_t[i] <= tension_max)
 
@@ -180,6 +196,14 @@ def solve_ocp(
     # time cost
     J += w_T * (M - 1) * dt  # total time
     J_k = [w_T * dt for _ in range(M)]  # evenly distribute time cost to all steps
+
+    # Static equilibrium at boundaries: soft penalty
+    w_equil = 1e5
+    equil_target = ca.DM([0.0, 0.0, pl_mass * g])
+    for k in [0, M - 1]:
+        err = sum_tension_vec(k) - equil_target
+        J += w_equil * ca.sumsqr(err)
+        J_k[k] += w_equil * ca.sumsqr(err)
 
     # waypoints soft constraints
     for j in range(1, N_wp - 1):
@@ -240,39 +264,72 @@ def solve_ocp(
             J += w_dtension * ca.sumsqr(cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]) / dt
             J_k[k] += w_dtension * ca.sumsqr(cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]) / dt
 
-    def log_barrier(p, c_obs, l_obs, d_safe=0.1, eps=1e-6):
-        gap = (ca.fabs(p - c_obs) - l_obs) / d_safe  # distance to box surface, normalized
-        t = ca.fmax(ca.fmin(gap, 1.0), 0.0)  # normalized gap with lower bound
-        w = 1.0 - t**3 * (10 - 15*t + 6*t**2)  # tangent continuous smooth weight
-        cost = -ca.log(ca.fmax(gap, eps)) / (-ca.log(eps))  # 1 at gap=0
-        return ca.sum1(w*cost) - 2.0
+    def box_barrier(p, c_obs, l_obs, d_safe=0.3):
+        """
+        Conjunction log barrier for an axis-aligned box obstacle.
 
-    def quadratic_barrier(p, c_obs, l_obs, d_safe=1e-6, eps=1e-6):
-        gap = ca.fabs(p - c_obs) - l_obs
-        cost = (gap / d_safe) ** 2  # 1 at gap=d_safe, 0 at gap=0
-        return ca.sum1(cost)
+        Axis i is penalised only when the agent is inside the *other* two axes
+        (smooth sigmoid indicator).  This gives a nonzero gradient even when
+        the agent sits dead-centre on a thin slab (where the L-inf gradient
+        would be zero), while still giving zero cost inside any passage gap.
 
+        The log barrier is extended quadratically inside the obstacle so the
+        solver always has finite, nonzero gradient to push the agent out.
+        """
+        eps = 1e-2      # log-barrier smoothing threshold
+        alpha_in = 5.0  # sigmoid sharpness for "inside other axes" indicator
+
+        # Normalised signed distances: >0 outside that axis range, <0 inside
+        gaps = [(ca.fabs(p[ax] - float(c_obs[ax])) - float(l_obs[ax])) / d_safe
+                for ax in range(3)]
+
+        def inside_w(ax):
+            """Smooth weight ≈1 when inside axis ax, ≈0 when outside."""
+            return 1.0 / (1.0 + ca.exp(alpha_in * gaps[ax]))
+
+        def patched_log(g):
+            """Log barrier with quadratic extension inside (g < eps) for gradient."""
+            return ca.if_else(
+                g > eps,
+                -ca.log(g),
+                -ca.log(eps) - (1.0 / eps) * (g - eps)
+                + (0.5 / eps ** 2) * (g - eps) ** 2,
+            )
+
+        cost = ca.MX(0.0)
+        for i in range(3):
+            j, k_ax = (i + 1) % 3, (i + 2) % 3
+            gap_i = gaps[i]
+            # Weight: activate axis-i barrier only when inside the other two axes
+            w_in = inside_w(j) * inside_w(k_ax)
+            # Quintic taper to zero at the safe horizon (gap_i = 1)
+            t = ca.fmax(ca.fmin(gap_i, 1.0), 0.0)
+            blend = 1.0 - t ** 3 * (10.0 - 15.0 * t + 6.0 * t ** 2)
+            cost = cost + w_in * blend * patched_log(gap_i)
+        return cost
+
+    obs_d_safe = cf_obs_radius * 1.5  # barrier horizon: 1.5× body radius from wall surface ≥ 1.5 steps
     for obs in obstacles:
         if "nogo" in obs:
             c = np.array(obs["nogo"]["center"])
-            half_cf = np.array(obs["nogo"]["size"]) / 2.0 + cf_radius
+            half_cf = np.array(obs["nogo"]["size"]) / 2.0 + cf_obs_radius
             half_pl = np.array(obs["nogo"]["size"]) / 2.0 + pl_radius
             for k in range(M):
                 # payload
-                J += w_obs * log_barrier(
-                    pl_p[:, k], c, half_pl)
-                J_k[k] += w_obs * log_barrier(
-                    pl_p[:, k], c, half_pl)
-                J_obs[k] += w_obs * log_barrier(
-                    pl_p[:, k], c, half_pl)
+                J += w_obs * box_barrier(
+                    pl_p[:, k], c, half_pl, d_safe=obs_d_safe)
+                J_k[k] += w_obs * box_barrier(
+                    pl_p[:, k], c, half_pl, d_safe=obs_d_safe)
+                J_obs[k] += w_obs * box_barrier(
+                    pl_p[:, k], c, half_pl, d_safe=obs_d_safe)
                 # drones
                 for i in range(3):
-                    J += w_obs * log_barrier(
-                        cf_p_it(i, k), c, half_cf)
-                    J_k[k] += w_obs * log_barrier(
-                        cf_p_it(i, k), c, half_cf)
-                    J_obs[k] += w_obs * log_barrier(
-                        cf_p_it(i, k), c, half_cf)
+                    J += w_obs * box_barrier(
+                        cf_p_it(i, k), c, half_cf, d_safe=obs_d_safe)
+                    J_k[k] += w_obs * box_barrier(
+                        cf_p_it(i, k), c, half_cf, d_safe=obs_d_safe)
+                    J_obs[k] += w_obs * box_barrier(
+                        cf_p_it(i, k), c, half_cf, d_safe=obs_d_safe)
 
     opti.minimize(J)
 
@@ -281,27 +338,40 @@ def solve_ocp(
     opti.set_initial(pl_p, pl_p_ref)
     opti.set_initial(pl_v, pl_v_ref)
 
-    base_dirs = np.zeros((3, 3))
+    # Build a time-varying cable direction guess by interpolating the formation
+    # orientation from the start position to the end position.  This gives the
+    # solver a hint about how the formation needs to rotate/translate along the
+    # trajectory rather than holding a fixed initial orientation.
     for i in range(3):
-        base_dirs[i] = (cf_p0[i] - pl_p_ref[:, 0]) / cable_l
-        opti.set_initial(cf_cable_dir[i], np.tile(base_dirs[i].reshape(3, 1), (1, M)))
+        dir_start = (cf_p0[i] - pl_p_ref[:, 0]) / cable_l
+        dir_end = (cf_p0_end[i] - pl_p_ref[:, -1]) / cable_l
+        dir_start /= np.linalg.norm(dir_start)
+        dir_end /= np.linalg.norm(dir_end)
+        dirs_guess = np.outer(dir_start, 1 - grid_nodes) + np.outer(dir_end, grid_nodes)
+        # re-normalise each column so the unit-norm constraint is satisfied
+        dirs_guess /= np.linalg.norm(dirs_guess, axis=0, keepdims=True)
+        opti.set_initial(cf_cable_dir[i], dirs_guess)
         opti.set_initial(cf_cable_t[i], 0.1)
 
     # ######### Solver #########
     s_opts = {
-        "max_iter": 1000,
+        "max_iter": 2000,
         "tol": 1e-4,
-        "acceptable_tol": 1e-3,
-        "acceptable_iter": 5,
+        "acceptable_tol": 1e-2,
+        "acceptable_iter": 10,
         "linear_solver": "mumps",
         "nlp_scaling_method": "gradient-based",
         "mu_strategy": "adaptive",
-        "print_level": 1,
-        "warm_start_init_point": "yes",
+        "print_level": 3,
     }
     p_opts = {"expand": True}
     opti.solver("ipopt", p_opts, s_opts)
-    sol = opti.solve()
+    try:
+        sol = opti.solve()
+    except RuntimeError as e:
+        print(f"\n[WARNING] IPOPT did not converge: {e}")
+        print("Extracting best iterate found so far...\n")
+        sol = opti.debug
 
     # Extract
     dt_sol = float(sol.value(dt))

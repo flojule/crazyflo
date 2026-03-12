@@ -42,7 +42,7 @@ def plot_ocp(ocp_data: dict, constraints=False, animate=False, folder=None):
     set_3d_axis(fig=f_3d, axes=a_3d)
 
     if animate:
-        animate_ocp(ocp_data)
+        animate_ocp(ocp_data, folder=folder)
     if folder is not None:
         save_plots(f_states, f_constr, f_3d, folder)
 
@@ -328,7 +328,7 @@ def plot_obstacles(obstacles, fig, axes):
                        color='gray', alpha=0.3, shade=True)
 
 
-def animate_ocp(ocp_data: dict):
+def animate_ocp(ocp_data: dict, folder=None):
     t = ocp_data["t"]
     interval = 100
 
@@ -429,6 +429,12 @@ def animate_ocp(ocp_data: dict):
         update,
         frames=M,
         interval=interval)
+
+    if folder is not None:
+        gif_path = folder / "animation.gif"
+        print(f"Saving animation to {gif_path} ...")
+        anim.save(gif_path, writer="pillow", fps=round(1000 / interval))
+        print("Animation saved.")
 
     plt.show()
     return anim

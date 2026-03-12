@@ -253,6 +253,40 @@ Estimates the payload position by computing the geometric centroid of the cable 
 | `rate_hz` | `200.0` | Update rate (Hz) |
 | `cable_length` | `0.5` | Cable length (m) |
 
+## Results
+
+Trajectories were generated for three mission types. All solutions reach `EXIT: Optimal Solution Found` with zero velocity and acceleration at start and end.
+
+### Figure-8
+
+Three drones carrying a shared payload along a lemniscate path (radius 0.5 m × 0.5 m, M=73 nodes, total duration 14.4 s).
+
+| Animation | States (altitude / speed / acceleration) |
+|:---:|:---:|
+| ![figure8 animation](figures/figure8/animation.gif) | ![figure8 states](figures/figure8/cf_plot.png) |
+
+---
+
+### Ellipse
+
+Three drones carrying a shared payload along a horizontal ellipse (radius 0.5 m × 0.25 m, M=51 nodes, total duration 10.0 s).
+
+| Animation | States (altitude / speed / acceleration) |
+|:---:|:---:|
+| ![ellipse animation](figures/ellipse/animation.gif) | ![ellipse states](figures/ellipse/cf_plot.png) |
+
+---
+
+### Obstacle course (`line_course`)
+
+Three drones carrying a shared payload through a three-obstacle slalom course: two vertical passages (lateral gap 0.6 m) and one horizontal passage (vertical gap 0.6 m), over a 10 m straight line (M=108 nodes, total duration 21.4 s).
+
+| 3-D trajectory | States (altitude / speed / acceleration) |
+|:---:|:---:|
+| ![line_course 3D](figures/line_course/cf_3d.png) | ![line_course states](figures/line_course/cf_plot.png) |
+
+---
+
 ## Data Files
 
 Pre-computed trajectories for three drones are stored in `data/`:

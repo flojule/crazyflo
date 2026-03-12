@@ -54,13 +54,13 @@ _plot_root = ROOT_FOLDER / "figures" # parent for all mission figure subfolders
 # Set to the name of a pre-computed mission folder under ROOT_FOLDER/data/,
 # e.g. 'line_course', 'ellipse', 'figure8', 'line_wall', ...
 # Set to None to list available missions and exit.
-MISSION = 'line_course'  # <-- select mission here
+MISSION = 'ellipse'  # <-- select mission here
 
 # ---------------------------------------------------------------------------
 # Plot flags - set to 1 / True to enable each plot type
 # ---------------------------------------------------------------------------
-PLOT = 0          # static states + 3-D trajectory view
-PLOT_ANIMATE = 0  # 3-D animation (slow for long trajectories)
+PLOT = 1          # static states + 3-D trajectory view
+PLOT_ANIMATE = 1  # 3-D animation (slow for long trajectories)
 PLOT_BAG = 0      # overlay real-flight bag data on OCP plots
 
 

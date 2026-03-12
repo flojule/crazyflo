@@ -1,4 +1,4 @@
-"""payload_sim.py - ROS 2 node for simulating payload position.
+"""crazyflo_sim.py - ROS 2 node for simulating payload position.
 
 This node estimates the 3-D position of a payload suspended below three
 Crazyflie drones by equal-length cables.  The payload position is computed
@@ -36,11 +36,11 @@ Usage
 -----
 Launched automatically by ``sim.launch.xml``::
 
-    <node pkg="crazyflo_planner" exec="payload_sim" name="payload" output="screen"/>
+    <node pkg="crazyflo_planner" exec="crazyflo_sim" name="payload" output="screen"/>
 
 Or manually::
 
-    ros2 run crazyflo_planner payload_sim
+    ros2 run crazyflo_planner crazyflo_sim
 """
 
 # from crazyflie_py import Crazyswarm
@@ -66,7 +66,7 @@ class PayloadSim(Node):
     """Simulate payload position based on drone positions and cable length."""
 
     def __init__(self):
-        super().__init__('payload_sim_node')
+        super().__init__('crazyflo_sim')
 
         self.get_logger().info('Starting payload simulation node...')
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""mission.py - execute pre-computed cooperative payload trajectories.
+"""crazyflo_mission.py - execute pre-computed cooperative payload trajectories.
 
 This script uploads 7th-degree polynomial trajectory CSVs (produced by
 ``crazyflo_solve.py``) to a swarm of Crazyflies and runs them in a
@@ -22,13 +22,15 @@ Pre-requisites
 
 Usage
 -----
-    python mission.py
+    ros2 run crazyflo_planner mission [MISSION]
 
-Set MISSION below to the folder name of the pre-computed mission you want
-to fly.  Run with MISSION = None to list available missions and exit.
+Available missions: ellipse, figure8, line_course (and any other folder
+under ROOT_FOLDER/data/ that contains traj_cf1.csv).
+Defaults to 'ellipse' when no argument is given.
 """
 
 from pathlib import Path
+import argparse
 
 from crazyflie_py import Crazyswarm
 from crazyflie_py.uav_trajectory import Trajectory
@@ -57,13 +59,8 @@ LANDING_TIME = 2.0  # [s]
 # ROOT_FOLDER = Path.home() / ".ros/crazyflo_planner"
 ROOT_FOLDER = Path.home() / "winter-project/ws/"
 
-# ---------------------------------------------------------------------------
-# Mission selector
-# ---------------------------------------------------------------------------
-# Set to the name of a pre-computed mission folder under ROOT_FOLDER/data/,
-# e.g. 'line_course', 'ellipse', 'figure8', 'line_wall', ...
-# Set to None to list available missions and exit without flying.
-MISSION = 'line_course'  # <-- select mission here
+# Default mission — overridden by CLI argument.
+DEFAULT_MISSION = 'ellipse'
 
 
 def list_missions(data_root: Path) -> list[str]:
@@ -83,19 +80,26 @@ def main():
     operator can visually confirm the drone state before advancing to the
     next phase.
     """
+    parser = argparse.ArgumentParser(description='Fly a pre-computed crazyflo mission.')
+    parser.add_argument(
+        'mission', nargs='?', default=DEFAULT_MISSION,
+        help=f'Mission name (folder under data/). Default: {DEFAULT_MISSION}')
+    args, _ = parser.parse_known_args()  # ignore ROS2 remapping args
+    MISSION = args.mission
+
     data_root = ROOT_FOLDER / "data"
     available = list_missions(data_root)
 
-    if MISSION is None:
-        print("Available missions:")
+    if MISSION == 'list':
+        print('Available missions:')
         for m in available:
-            print(f"  {m}")
+            print(f'  {m}')
         return
 
     if MISSION not in available:
         print(f"Mission '{MISSION}' not found. Available missions:")
         for m in available:
-            print(f"  {m}")
+            print(f'  {m}')
         raise SystemExit(1)
 
     data_path = data_root / MISSION

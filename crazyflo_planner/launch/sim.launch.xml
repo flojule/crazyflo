@@ -8,7 +8,7 @@
     </include>
 
     <!-- payload -->
-    <node pkg="crazyflo_planner" exec="payload_sim" name="payload" output="screen"/>
+    <node pkg="crazyflo_planner" exec="sim" name="payload" output="screen"/>
 
     <!-- rviz -->
     <arg name="rviz_config" default="$(find-pkg-share crazyflo_planner)/config/config.rviz" description="RViz config file"/>

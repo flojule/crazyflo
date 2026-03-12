@@ -53,7 +53,7 @@ if __name__ == "__main__":
     #    'random'   - random walk (non-repeatable)
     # ------------------------------------------------------------------
     trajs = ['line', 'ellipse', 'figure8', 'random']
-    traj = trajs[0]  # <-- select trajectory type here
+    traj = trajs[1]  # <-- select trajectory type here
 
     # ------------------------------------------------------------------
     # 2. Obstacle layout selection
@@ -65,9 +65,12 @@ if __name__ == "__main__":
     #    'course'            - three-obstacle slalom course
     # ------------------------------------------------------------------
     obstacles_types = [None, 'wall', 'vertical_passage', 'horizontal_passage', 'course']
-    obstacles_type = obstacles_types[-1]  # <-- select obstacle type here
+    obstacles_type = obstacles_types[0]  # <-- select obstacle type here
     gap = 0.6    # gap size for passage obstacles [m]
-    length = 10.0  # total length of the trajectory / obstacle course [m]
+    if obstacles_type == 'course':
+        length = 10.0  # total length of the trajectory / obstacle course [m]
+    else:
+        length = 2.0  # total length of the trajectory / obstacle course [m]
 
     # ------------------------------------------------------------------
     # 3. Physical parameters
