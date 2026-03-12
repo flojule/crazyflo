@@ -1,4 +1,4 @@
-"""payload_sim.py — ROS 2 node for simulating payload position.
+"""payload_sim.py - ROS 2 node for simulating payload position.
 
 This node estimates the 3-D position of a payload suspended below three
 Crazyflie drones by equal-length cables.  The payload position is computed
@@ -14,7 +14,7 @@ Published topics
 
 Broadcast TF frames
 -------------------
-``world`` → ``payload``
+``world`` -> ``payload``
     Updated at ``rate_hz`` whenever the payload is in the ATTACHED state
     and at least 1 second has elapsed since startup (to let TF settle).
 
@@ -120,8 +120,8 @@ class PayloadSim(Node):
         self.payload_pose.position.z = 0.0
         self.payload_pose.orientation.w = 1.0
 
-        # Elapsed time counter used to delay estimation until TF has settled
-        self.time = 0.0
+        # Record startup time to delay estimation until TF has settled
+        self._start_stamp = self.get_clock().now().nanoseconds * 1e-9
 
     def timer_callback(self):
         """Timer callback: update payload position and publish marker.
@@ -129,8 +129,8 @@ class PayloadSim(Node):
         Estimation is skipped for the first second after startup to allow
         the TF buffer to populate with valid drone transforms.
         """
-        self.time += 1.0 / self.rate_hz
-        if self.time > 1.0:  # wait 1 s for TF to settle
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if now - self._start_stamp > 1.0:  # wait 1 s for TF to settle
             if self.payload_state == PayloadState.ATTACHED:
                 self.calc_payload_position()
                 self.publish_payload_marker()
@@ -169,7 +169,7 @@ class PayloadSim(Node):
 
         # Build local orthonormal frame centred at P1
         ex = (P2 - P1)
-        d = np.linalg.norm(ex)   # distance P1 → P2
+        d = np.linalg.norm(ex)   # distance P1 -> P2
         if d < 1e-6:
             self.get_logger().warn("P1 and P2 too close for trilateration.")
             return
@@ -189,7 +189,7 @@ class PayloadSim(Node):
         x = d / 2.0                       # equal radii simplification
         y = (i*i + j*j) / (2.0*j) - (i/j) * x
 
-        z2 = L*L - x*x - y*y             # z² from the sphere equation
+        z2 = L*L - x*x - y*y             # z^2 from the sphere equation
         if z2 < 0.0:
             self.get_logger().warn("No real intersection (z^2 < 0).")
             return

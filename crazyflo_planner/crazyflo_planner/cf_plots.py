@@ -5,6 +5,13 @@ import numpy as np
 COLORS = ['r', 'g', 'b']
 
 
+def _unwrap(x):
+    """Unwrap a 0-d NumPy object array (as produced by np.load with allow_pickle=True)."""
+    if isinstance(x, np.ndarray) and x.ndim == 0:
+        return x.item()
+    return x
+
+
 def plot_ocp(ocp_data: dict, constraints=False, animate=False, folder=None):
     """Plot data from OCP solution dictionary."""
     if not constraints:
@@ -19,7 +26,7 @@ def plot_ocp(ocp_data: dict, constraints=False, animate=False, folder=None):
     pl_p_ref = ocp_data["pl_p_ref"]
     cable_l = ocp_data["cable_l"]
     cf_radius = ocp_data["cf_radius"]
-    obstacles = ocp_data["obstacles"]
+    obstacles = _unwrap(ocp_data["obstacles"])
     waypoints = ocp_data["waypoints"]
 
     f_states, a_states = plot_states_cf(t, cf_p, cf_v, cf_a)
@@ -85,7 +92,7 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-',
         fig, axes = plt.subplots(3, 1, sharex=True, figsize=(16, 14))
     axes[0].set_ylabel("Altitude [m]")
     axes[1].set_ylabel("Speed [m/s]")
-    axes[2].set_ylabel("Acceleration [m/s]")
+    axes[2].set_ylabel("Acceleration [m/s^2]")
     # axes[3, 0].set_ylabel("Jerk [m/s]")
     # axes[3, 0].set_xlabel("Time [s]")
     axes[2].set_xlabel("Time [s]")
@@ -351,7 +358,7 @@ def animate_ocp(ocp_data: dict):
     cables = [ax.plot([], [], [], "k--")[0] for _ in range(3)]
 
     # obstacles
-    obstacles = ocp_data.get("obstacles", [])
+    obstacles = _unwrap(ocp_data.get("obstacles", []))
     if len(obstacles) > 0:
         plot_obstacles(obstacles, fig=fig, axes=ax)
 
@@ -437,6 +444,10 @@ def plot_bag(bag_data: dict, t_offset=0.0, t_total=10.0, cable_l=0.5,
         fig_3d = plt.figure(figsize=(12, 12))
         axes_3d = fig_3d.add_subplot(111, projection="3d")
         print("Warning: creating new 3d figure and axes in plot_bag. This may cause multiple figures if called from plot_ocp.")
+    # Work on a copy so we don't mutate the caller's dict
+    bag_data = {k: v.copy() if isinstance(v, np.ndarray) else v
+                for k, v in bag_data.items()}
+
     t = bag_data["t"]
     for ax in axes.flatten():
         ax.set_xlim(-1, t_total + 1)
@@ -598,7 +609,7 @@ def get_pl_math(c0: np.ndarray, c1: np.ndarray, c2: np.ndarray, r: float):
     c1 = np.asarray(c1, dtype=float).reshape(3)
     c2 = np.asarray(c2, dtype=float).reshape(3)
 
-    # Two plane equations: (c1-c0)·x = (||c1||^2 - ||c0||^2)/2 and same for c2
+    # Two plane equations: (c1-c0).x = (||c1||^2 - ||c0||^2)/2 and same for c2
     n1 = c1 - c0
     n2 = c2 - c0
 
@@ -642,7 +653,7 @@ def plot_cost(ocp_data):
     cost = ocp_data["cost"]
     cost_obs = ocp_data["cost_obs"]
     time = ocp_data["t"]
-    obstacles = ocp_data["obstacles"]
+    obstacles = _unwrap(ocp_data["obstacles"])
 
     if obstacles is not None and len(obstacles) > 0:
         passage_obs = [obs for obs in obstacles if "passage" in obs]

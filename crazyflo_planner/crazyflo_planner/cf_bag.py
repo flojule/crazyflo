@@ -37,7 +37,6 @@ def get_bag_data(bag_path):
     reader.set_filter(filter_poses)
 
     bag_data_topics = {}
-    bag_data = {}
 
     while reader.has_next():
         topic, raw, timestamp = reader.read_next()
@@ -97,7 +96,7 @@ def get_bag_data(bag_path):
         # cf_a[j] = np.array(cf_a[j]).T  # (3, N)
 
     if len(t2) == 0 or len(t3) == 0:
-        t_new = np.asarray(t1)
+        t_new = t[0].copy()
     else:
         # find common time range
         t_start = max(t1[0], t2[0], t3[0])

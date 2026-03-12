@@ -1,17 +1,21 @@
-"""crazyflo_plot.py — post-flight analysis and visualisation script.
+"""crazyflo_plot.py - post-flight analysis and visualisation script.
 
 This script loads a saved OCP solution (ocp.npz) and optionally a rosbag2
 recording, then produces plots for comparison and validation.
+
+Mission selector
+----------------
+Set MISSION to the name of the pre-computed mission folder under data/
+(e.g. 'line_course', 'ellipse').  This mirrors the folder layout produced
+by crazyflo_solve.py.  Set to None to list available missions and exit.
 
 Flight flags
 ------------
 Set the three flags at module level to choose which plots to generate:
 
-    PLOT         – static trajectory / state plots and 3-D view.
-    PLOT_ANIMATE – 3-D animation of the OCP solution.
-    PLOT_BAG     – overlay rosbag2 measurements on OCP plots.
-                   When enabled, ``data_folder`` is read from the bag
-                   directory instead of the default data folder.
+    PLOT         - static trajectory / state plots and 3-D view.
+    PLOT_ANIMATE - 3-D animation of the OCP solution.
+    PLOT_BAG     - overlay rosbag2 measurements on OCP plots.
 
 Bag alignment
 -------------
@@ -41,19 +45,55 @@ import matplotlib.pyplot as plt
 # ---------------------------------------------------------------------------
 ROOT_FOLDER = Path.home() / "winter-project/ws/"
 BAGS_FOLDER = ROOT_FOLDER / "bags"   # parent directory for all rosbag2 recordings
-
-plot_folder = ROOT_FOLDER / "figures"
-plot_folder.mkdir(parents=True, exist_ok=True)
+_data_root = ROOT_FOLDER / "data"    # parent for all mission subfolders
+_plot_root = ROOT_FOLDER / "figures" # parent for all mission figure subfolders
 
 # ---------------------------------------------------------------------------
-# Plot flags — set to 1 / True to enable each plot type
+# Mission selector
+# ---------------------------------------------------------------------------
+# Set to the name of a pre-computed mission folder under ROOT_FOLDER/data/,
+# e.g. 'line_course', 'ellipse', 'figure8', 'line_wall', ...
+# Set to None to list available missions and exit.
+MISSION = 'line_course'  # <-- select mission here
+
+# ---------------------------------------------------------------------------
+# Plot flags - set to 1 / True to enable each plot type
 # ---------------------------------------------------------------------------
 PLOT = 0          # static states + 3-D trajectory view
 PLOT_ANIMATE = 0  # 3-D animation (slow for long trajectories)
 PLOT_BAG = 0      # overlay real-flight bag data on OCP plots
 
 
+def list_missions(data_root: Path) -> list[str]:
+    """Return sorted list of mission names available under data_root."""
+    if not data_root.exists():
+        return []
+    return sorted(
+        d.name for d in data_root.iterdir()
+        if d.is_dir() and (d / 'ocp.npz').exists()
+    )
+
+
 if __name__ == "__main__":
+    available = list_missions(_data_root)
+
+    if MISSION is None:
+        print("Available missions:")
+        for m in available:
+            print(f"  {m}")
+        raise SystemExit(0)
+
+    if MISSION not in available:
+        print(f"Mission '{MISSION}' not found. Available missions:")
+        for m in available:
+            print(f"  {m}")
+        raise SystemExit(1)
+
+    data_folder = _data_root / MISSION
+    plot_folder = _plot_root / MISSION
+    plot_folder.mkdir(parents=True, exist_ok=True)
+    print(f"Mission: '{MISSION}'  ->  {data_folder}")
+
     # ------------------------------------------------------------------
     # Bag selection
     # Comment/uncomment the desired bag folder and its time offset.
@@ -69,17 +109,17 @@ if __name__ == "__main__":
 
     # When plotting bag data, load state CSVs that were saved into the
     # bag directory by the post-processing pipeline; otherwise use the
-    # standard data folder from the planning step.
+    # mission data folder from the planning step.
     if PLOT_BAG:
-        data_folder = BAGS_FOLDER / bag_folder / "data"
+        ocp_data_folder = BAGS_FOLDER / bag_folder / "data"
     else:
-        data_folder = ROOT_FOLDER / "data"
+        ocp_data_folder = data_folder
 
     # ------------------------------------------------------------------
     # Load OCP solution
     # ocp.npz contains the full solution dict produced by cf_solver.
     # ------------------------------------------------------------------
-    ocp_path = data_folder / "ocp.npz"
+    ocp_path = ocp_data_folder / "ocp.npz"
     ocp_sol = np.load(ocp_path, allow_pickle=True)
     cable_l = ocp_sol["cable_l"]                       # cable length [m]
     t_total = ocp_sol["t"][-1] - ocp_sol["t"][0]      # total trajectory duration [s]
@@ -125,7 +165,7 @@ if __name__ == "__main__":
             fig=f_xyz, axes=a_xyz)
 
     # ------------------------------------------------------------------
-    # Cost plot — always shown regardless of other flags
+    # Cost plot - always shown regardless of other flags
     # ------------------------------------------------------------------
     # cf_plots.save_plots(f_states, f_constr, f_3d, plot_folder)  # optional save
     cf_plots.plot_cost(ocp_sol)  # bar chart of weighted OCP cost terms

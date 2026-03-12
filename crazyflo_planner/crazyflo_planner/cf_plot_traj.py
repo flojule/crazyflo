@@ -64,6 +64,7 @@ def plot_trajectory_from_csv(csv_path: str):
     }
 
 
-# Example
-file = "/home/florian-jule/.ros/crazyflo_planner/data/traj_cf2.csv"
-plot_trajectory_from_csv(file)
+if __name__ == "__main__":
+    # Example
+    file = "/home/florian-jule/.ros/crazyflo_planner/data/traj_cf2.csv"
+    plot_trajectory_from_csv(file)

@@ -207,17 +207,11 @@ def _eval_segment(cseg: np.ndarray, tau: float, deriv: int) -> np.ndarray:
 
 
 def _poly_eval_7(c: np.ndarray, t: float, deriv: int) -> float:
-    t = float(t)
+    if deriv not in (0, 1, 2, 3):
+        raise ValueError("deriv must be 0,1,2,3")
     c = np.asarray(c, dtype=float)
-    if deriv == 0:
-        return float(sum(c[k] * (t ** k) for k in range(8)))
-    if deriv == 1:
-        return float(sum(k * c[k] * (t ** (k - 1)) for k in range(1, 8)))
-    if deriv == 2:
-        return float(sum(k * (k - 1) * c[k] * (t ** (k - 2)) for k in range(2, 8)))
-    if deriv == 3:
-        return float(sum(k * (k - 1) * (k - 2) * c[k] * (t ** (k - 3)) for k in range(3, 8)))
-    raise ValueError("deriv must be 0,1,2,3")
+    dc = np.polynomial.polynomial.polyder(c, deriv)
+    return float(np.polynomial.polynomial.polyval(float(t), dc))
 
 
 def _solve_minsnap_axis(p_wp: np.ndarray, T: np.ndarray, continuity_order: int) -> np.ndarray:
@@ -225,7 +219,7 @@ def _solve_minsnap_axis(p_wp: np.ndarray, T: np.ndarray, continuity_order: int) 
     1D min-snap with 7th degree per segment:
       p(tau)=sum a_k tau^k, tau in [0,T_i]
     Objective:
-      minimize sum_i ∫_0^{T_i} (p''''(tau))^2 d tau
+      minimize sum_i int_0^{T_i} (p''''(tau))^2 d tau
     Constraints:
       - p at all waypoints (start at seg0 tau=0, and each seg end tau=T_i)
       - start/end: v=a=j=0 (j included if continuity_order>=3)
@@ -283,7 +277,7 @@ def _solve_minsnap_axis(p_wp: np.ndarray, T: np.ndarray, continuity_order: int) 
 
     # KKT solve for equality-constrained QP:
     # [H  A^T][x] = [0]
-    # [A   0 ][λ]   [b]
+    # [A   0 ][lam]   [b]
     eps = 1e-12
     H_reg = H + eps * np.eye(Nvar)
 
@@ -325,7 +319,7 @@ def _basis_7th(t: float, deriv: int) -> np.ndarray:
 
 def _snap_hessian_7th(T: float) -> np.ndarray:
     """
-    H such that  ∫_0^T (p''''(t))^2 dt = c^T H c  for 7th degree coefficients c.
+    H such that  int_0^T (p''''(t))^2 dt = c^T H c  for 7th degree coefficients c.
     """
     T = float(T)
     H = np.zeros((8, 8), dtype=float)

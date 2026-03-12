@@ -38,12 +38,14 @@ def solve_ocp(
     w_pl_aT: float = 1e0,  # terminal acceleration weight
     w_cf_pT: float = 1e0,  # terminal position weight (formation)
     w_obs: float = 1e3,  # obstacle avoidance weight
-    obstacles: list = [],  # list of obstacles {'center', 'size'}
+    obstacles: list | None = None,  # list of obstacles {'center', 'size'}
     dt_min: float = 0.05,  # minimum time step for variable time grid
     dt_max: float = 0.2,  # maximum time step for variable time grid
     dt_guess: float = 0.1,  # initial guess for time step
 ) -> dict:
     """Solve the 3-drone payload OCP."""
+    if obstacles is None:
+        obstacles = []
 
     N_wp = waypoints.shape[0]
 
@@ -107,7 +109,6 @@ def solve_ocp(
         return s
 
     for k in [0, M-1]:
-        opti.subject_to(pl_v[:, k] == ca.DM.zeros(3, 1))
         opti.subject_to(sum_tension_vec(k) == ca.DM([0.0, 0.0, pl_mass * g]))
 
     # Drones boundary conditions
@@ -383,7 +384,7 @@ def print_ocp_stats(sol):
         # print max velocity and acceleration
         v_max = np.max(np.linalg.norm(sol[f"{cf}_v"], axis=0))
         a_max = np.max(np.linalg.norm(sol[f"{cf}_a"], axis=0))
-        print(f" v_max: {v_max:.2f} m/s,  a_max: {a_max:.2f} m/s²")
+        print(f" v_max: {v_max:.2f} m/s,  a_max: {a_max:.2f} m/s^2")
 
         p = sol[f"{cf}_p"]
         print(f' dimensions: {p.shape}')

@@ -133,7 +133,7 @@ def save_poly7_csv(sol, folder, v_max=2.0, a_max=5.0):
 
         path = Path(csv_path)
 
-        t = np.asarray(poly7.t_knots, dtype=float)
+        t_knots = np.asarray(poly7.t_knots, dtype=float)
         coeffs = np.asarray(poly7.coeffs, dtype=float)
 
         num_seg = coeffs.shape[0]
@@ -152,17 +152,17 @@ def save_poly7_csv(sol, folder, v_max=2.0, a_max=5.0):
             writer = csv.writer(f)
             writer.writerow(header)
 
-            for i in range(num_seg):
-                duration = float(t[i + 1] - t[i])
+            for seg in range(num_seg):
+                duration = float(t_knots[seg + 1] - t_knots[seg])
 
                 row = [duration]
 
                 # x, y, z coefficients
                 for axis in range(3):
-                    row.extend(coeffs[i, axis, :].tolist())
+                    row.extend(coeffs[seg, axis, :].tolist())
 
                 # yaw coefficients
-                row.extend(yaw_coeffs[i, :].tolist())
+                row.extend(yaw_coeffs[seg, :].tolist())
 
                 writer.writerow(row)
     print(f"Poly7 trajectory CSV files for cf1, cf2, cf3 saved to {folder}")

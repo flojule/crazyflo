@@ -23,8 +23,12 @@ def generate_figure8(r_A=0.6, r_B=0.6, height=0.5, grid=None):
     return waypoints
 
 
-def generate_line(start=np.array([0, 0, 0.5]), end=np.array([2, 0, 0.5]), grid=None):
+def generate_line(start=None, end=None, grid=None):
     """Generate a straight line trajectory."""
+    if start is None:
+        start = np.array([0.0, 0.0, 0.5])
+    if end is None:
+        end = np.array([2.0, 0.0, 0.5])
     if grid is None:
         grid = np.linspace(0, 1, 2)
     waypoints = np.stack([np.linspace(start[0], end[0], grid.shape[0]),
@@ -34,8 +38,10 @@ def generate_line(start=np.array([0, 0, 0.5]), end=np.array([2, 0, 0.5]), grid=N
     return waypoints
 
 
-def generate_random_walk(start=np.array([0, 0, 0.5]), step_size=0.5, grid=None):
+def generate_random_walk(start=None, step_size=0.5, grid=None):
     """Generate a random walk trajectory."""
+    if start is None:
+        start = np.array([0.0, 0.0, 0.5])
     if grid is None:
         grid = np.linspace(0, 1, 20)
     waypoints = [start]
