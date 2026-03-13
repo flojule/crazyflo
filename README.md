@@ -1,8 +1,10 @@
 # crazyflo
 
-[Watch the demo video](https://github.com/user-attachments/assets/48989a06-b6cf-4c2b-961a-385476a8ae29)
+![Portfolio post](https://flojule.github.io/projects/nu-499/crazyflo/)
 
 Cooperative payload transport with a swarm of three [Crazyflie](https://www.bitcraze.io/) drones connected to a shared payload via cables.
+
+[Watch the demo video](https://github.com/user-attachments/assets/48989a06-b6cf-4c2b-961a-385476a8ae29)
 
 ## What it does
 
