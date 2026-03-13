@@ -112,8 +112,14 @@ def plot_states_cf(t, cf_p, cf_v=None, cf_a=None, linestyle='-',
                 color=COLORS[i], linestyle=linestyle, linewidth=1)
         if cf_a is not None:
             accels = np.linalg.norm(cf_a[i, :, :], axis=0)
+            if accels.shape[0] == t.shape[0]:
+                t_a = t
+            elif accels.shape[0] == t.shape[0] - 1:
+                t_a = t[:-1]
+            else:
+                t_a = t[:accels.shape[0]]
             axes[2].plot(
-                t[:-1], accels, label=f"Drone {i+1}",
+                t_a, accels, label=f"Drone {i+1}",
                 color=COLORS[i], linestyle=linestyle, linewidth=1)
 
             # jerks = np.linalg.norm(
@@ -430,11 +436,11 @@ def animate_ocp(ocp_data: dict, folder=None):
         frames=M,
         interval=interval)
 
-    if folder is not None:
-        gif_path = folder / "animation.gif"
-        print(f"Saving animation to {gif_path} ...")
-        anim.save(gif_path, writer="pillow", fps=round(1000 / interval))
-        print("Animation saved.")
+    # if folder is not None:
+    #     gif_path = folder / "animation.gif"
+    #     print(f"Saving animation to {gif_path} ...")
+    #     anim.save(gif_path, writer="pillow", fps=round(1000 / interval))
+    #     print("Animation saved.")
 
     plt.show()
     return anim

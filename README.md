@@ -1,12 +1,15 @@
 # crazyflo
 
-[Watch the demo video](https://github.com/user-attachments/assets/08495a9e-1ff6-4af9-ac21-35a55d5e8173)
+[Watch the demo video](https://github.com/user-attachments/assets/48989a06-b6cf-4c2b-961a-385476a8ae29)
 
 Cooperative payload transport with a swarm of three [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones connected to a shared payload via cables.
 
 ## What it does
 
 Three drones fly in formation, each attached to the same payload by a cable. An **Optimal Control Problem (OCP)** is solved offline to generate dynamically feasible, collision-free trajectories for all drones simultaneously. The resulting trajectories are uploaded to the firmware and executed.
+
+![ellipse sim](crazyflo_planner/figures/ellipse/ellipse_sim.gif)
+
 
 ### Figure-8
 

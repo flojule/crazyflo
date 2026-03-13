@@ -77,7 +77,8 @@ def generate_waypoints(traj='ellipse', height=0.5, length=2.0, loops=5, N=20, fo
             [p0[:-1] for _ in range(loops - 1)] + [p0], axis=0)
 
     # save pl_waypoints to csv
-    out = folder / "pl_waypoints.csv"
+    from pathlib import Path
+    out = Path(folder) / "pl_waypoints.csv"
     np.savetxt(out, waypoints, delimiter=",")
     print(f"Wrote {out} with {len(waypoints)} waypoints.")
 

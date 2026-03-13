@@ -23,6 +23,7 @@ configure the run without touching the module code.
 
 import cf_waypoints
 import cf_solver
+import cf_solver_feb6
 import cf_plots
 import cf_csv
 import cf_obstacles
@@ -42,6 +43,10 @@ _plot_root = ROOT_FOLDER / "figures"    # parent for all mission figure subfolde
 # Set to True to display plots and animation after solving.
 PLOT_OCP = True
 
+# Select OCP backend: 'current' keeps the newer structure on a fixed-time grid,
+# 'feb6' uses the older working formulation adapted to the current interface.
+SOLVER_BACKEND = "current"  # 'current' or 'feb6'
+
 
 if __name__ == "__main__":
     # ------------------------------------------------------------------
@@ -53,7 +58,7 @@ if __name__ == "__main__":
     #    'random'   - random walk (non-repeatable)
     # ------------------------------------------------------------------
     trajs = ['line', 'ellipse', 'figure8', 'random']
-    traj = trajs[1]  # <-- select trajectory type here
+    traj = trajs[2]  # <-- select trajectory type here
 
     # ------------------------------------------------------------------
     # 2. Obstacle layout selection
@@ -85,7 +90,8 @@ if __name__ == "__main__":
     #    All files are written to data/<mission>/ and figures/<mission>/
     # ------------------------------------------------------------------
     use_obstacles = (obstacles_type is not None and traj == 'line')
-    mission = f"{traj}_{obstacles_type}" if use_obstacles else traj
+    mission_base = f"{traj}_{obstacles_type}" if use_obstacles else traj
+    mission = mission_base if SOLVER_BACKEND == "current" else f"{mission_base}_{SOLVER_BACKEND}"
 
     data_folder = _data_root / mission
     plot_folder = _plot_root / mission
@@ -98,7 +104,7 @@ if __name__ == "__main__":
     #    Waypoints are saved to data_folder/pl_waypoints.csv.
     # ------------------------------------------------------------------
     waypoints = cf_waypoints.generate_waypoints(
-        traj=traj, height=pl_height, length=length, N=10, folder=data_folder)
+        traj=traj, height=pl_height, length=length, N=10, folder=str(data_folder))
 
     # ------------------------------------------------------------------
     # 6. Build obstacle list
@@ -121,7 +127,13 @@ if __name__ == "__main__":
     #      'cf{1,2,3}_cable_t'   - cable tensions
     #      metadata: 'cable_l', 'cf_radius', 'obstacles', 'waypoints', ...
     # ------------------------------------------------------------------
-    sol = cf_solver.solve_ocp(
+    solver_module = {
+        "current": cf_solver,
+        "feb6": cf_solver_feb6,
+    }[SOLVER_BACKEND]
+    print(f"Using solver backend: {SOLVER_BACKEND}")
+
+    sol = solver_module.solve_ocp(
         waypoints=waypoints,
         cable_l=cable_l,
         cf_v_max=cf_v_max,
@@ -136,8 +148,8 @@ if __name__ == "__main__":
     #    save_time_pos_csv- write dense per-drone state CSVs
     #    save_poly7_csv   - write firmware-compatible poly-7 CSVs
     # ------------------------------------------------------------------
-    cf_solver.print_ocp_stats(sol)
-    cf_solver.save_ocp(sol, path=data_folder)
+    solver_module.print_ocp_stats(sol)
+    solver_module.save_ocp(sol, path=data_folder)
     cf_csv.save_time_pos_csv(sol, path=data_folder)
 
     # Convert OCP states to 7th-degree polynomial segments and export
