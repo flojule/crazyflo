@@ -2,7 +2,7 @@
 
 [Watch the demo video](https://github.com/user-attachments/assets/48989a06-b6cf-4c2b-961a-385476a8ae29)
 
-Cooperative payload transport with a swarm of three [Crazyflie](https://www.bitcraze.io/products/crazyflie-2-1/) drones connected to a shared payload via cables.
+Cooperative payload transport with a swarm of three [Crazyflie](https://www.bitcraze.io/) drones connected to a shared payload via cables.
 
 ## What it does
 
