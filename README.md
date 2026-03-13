@@ -36,14 +36,13 @@ See [crazyflo_planner/README.md](crazyflo_planner/README.md) for the full module
 
 ```bash
 # 1 — Plan trajectories (offline, no drones needed)
-cd crazyflo_planner/crazyflo_planner
 python crazyflo_solve.py
 
-# 2 — Launch simulation
+# 2 — Launch simulation or real drones
 ros2 launch crazyflo_planner sim.launch.xml
-
-# 3 — Or launch on real drones + run the mission script
 ros2 launch crazyflo_planner real.launch.xml
+
+# 3 — Run the mission script (add mission arguments as needed, figure8, ellipse, etc.)`)
 ros2 run crazyflo_planner mission
 ```
 
