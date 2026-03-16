@@ -48,6 +48,54 @@ ros2 launch crazyflo_planner real.launch.xml
 ros2 run crazyflo_planner mission
 ```
 
+
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/flojule/crazyflo.git
+cd crazyflo
+```
+
+### 2. Install Python dependencies
+
+It is recommended to use a virtual environment:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Install ROS 2 (Humble or later)
+
+Follow the [official ROS 2 installation guide](https://docs.ros.org/en/humble/Installation.html) for your platform.
+
+### 4. Install Crazyswarm2
+
+Follow the [Crazyswarm2 installation instructions](https://imrclab.github.io/crazyswarm2/installation.html):
+
+```bash
+pip install crazyswarm2
+```
+
+### 5. Install cfclient (optional, for Crazyflie configuration)
+
+See [cfclient documentation](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/installation/):
+
+```bash
+pip install cfclient
+```
+
+### 6. Build the ROS 2 package
+
+```bash
+cd ~/ws
+colcon build --packages-select crazyflo_planner
+source install/setup.bash
+```
+
 ---
 
 ## Key dependencies
