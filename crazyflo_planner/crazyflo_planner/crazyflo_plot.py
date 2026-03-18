@@ -5,9 +5,7 @@ recording, then produces plots for comparison and validation.
 
 Mission selector
 ----------------
-Set MISSION to the name of the pre-computed mission folder under data/
-(e.g. 'line_course', 'ellipse').  This mirrors the folder layout produced
-by crazyflo_solve.py.  Set to None to list available missions and exit.
+Set MISSION to the name of the pre-computed mission folder under data.
 
 Flight flags
 ------------
@@ -19,14 +17,10 @@ Set the three flags at module level to choose which plots to generate:
 
 Bag alignment
 -------------
-Real flight recordings often start before the trajectory begins.
+Real flight recordings start before the trajectory begins.
 Set ``t_offset`` to the number of seconds that should be subtracted from
 the bag timestamps so that the trajectory start aligns with t = 0 in the
 OCP solution.
-
-Usage
------
-    python crazyflo_plot.py
 """
 
 import cf_solver
@@ -54,10 +48,10 @@ _plot_root = ROOT_FOLDER / "figures" # parent for all mission figure subfolders
 # Set to the name of a pre-computed mission folder under ROOT_FOLDER/data/,
 # e.g. 'line_course', 'ellipse', 'figure8', 'line_wall', ...
 # Set to None to list available missions and exit.
-MISSION = 'ellipse'  # <-- select mission here
+MISSION = 'ellipse_feb6'  # <-- select mission here
 
 # ---------------------------------------------------------------------------
-# Plot flags - set to 1 / True to enable each plot type
+# Plot flags
 # ---------------------------------------------------------------------------
 PLOT = 1          # static states + 3-D trajectory view
 PLOT_ANIMATE = 1  # 3-D animation (slow for long trajectories)
@@ -108,8 +102,7 @@ if __name__ == "__main__":
     # bag_folder, t_offset = "rosbag2_0226_2", 8.3
 
     # When plotting bag data, load state CSVs that were saved into the
-    # bag directory by the post-processing pipeline; otherwise use the
-    # mission data folder from the planning step.
+    # bag directory. Otherwise, load from the OCP solution folder.
     if PLOT_BAG:
         ocp_data_folder = BAGS_FOLDER / bag_folder / "data"
     else:
@@ -125,7 +118,6 @@ if __name__ == "__main__":
     t_total = ocp_sol["t"][-1] - ocp_sol["t"][0]      # total trajectory duration [s]
     print(f"loaded OCP solution from {ocp_path}")
 
-    # Print a summary of the OCP result (cost breakdown, constraint violations)
     cf_solver.print_ocp_stats(ocp_sol)
 
     # ------------------------------------------------------------------
@@ -136,10 +128,10 @@ if __name__ == "__main__":
         f_states, a_states, f_constr, a_constr, f_3d, a_3d = cf_plots.plot_ocp(
             ocp_sol, constraints=False)
     if PLOT_ANIMATE:
-        # 3-D animation; opens a separate matplotlib window
-        cf_plots.animate_ocp(ocp_sol)
+        # 3-D animation
+        cf_plots.animate_ocp(ocp_sol, folder=plot_folder)
     if PLOT_BAG:
-        # Per-axis position over time (useful for timeline alignment check)
+        # Compare OCP solution to bag data in per-axis position plot
         f_xyz, a_xyz = cf_plots.plot_xyz(ocp_sol)
 
     # ------------------------------------------------------------------
@@ -155,11 +147,9 @@ if __name__ == "__main__":
                 bag_data, t_offset, t_total, cable_l,
                 fig=f_states, axes=a_states,
                 fig_3d=f_3d, axes_3d=a_3d)
-            # Uncomment to add a tracking-error plot:
             # f_states, a_states = cf_plots.plot_error(
             #     ocp_sol, bag_data, t_offset, t_total,
             #     fig=f_states, axes=a_states)
-        # Per-axis position for bag data (overlaid on OCP axes)
         f_xyz, a_xyz = cf_plots.plot_xyz(
             bag_data, t_offset, t_total,
             fig=f_xyz, axes=a_xyz)
@@ -167,7 +157,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     # Cost plot - always shown regardless of other flags
     # ------------------------------------------------------------------
-    # cf_plots.save_plots(f_states, f_constr, f_3d, plot_folder)  # optional save
+    # cf_plots.save_plots(f_states, f_constr, f_3d, plot_folder)
     cf_plots.plot_cost(ocp_sol)  # bar chart of weighted OCP cost terms
 
     plt.show()

@@ -1,6 +1,6 @@
 # crazyflo
 
-![Portfolio post](https://flojule.github.io/projects/nu-499/crazyflo/)
+[Portfolio post](https://flojule.github.io/projects/nu-499/crazyflo/)
 
 Cooperative payload transport with a swarm of three [Crazyflie](https://www.bitcraze.io/) drones connected to a shared payload via cables.
 
@@ -44,7 +44,7 @@ python crazyflo_solve.py
 ros2 launch crazyflo_planner sim.launch.xml
 ros2 launch crazyflo_planner real.launch.xml
 
-# 3 — Run the mission script (add mission arguments as needed, figure8, ellipse, etc.)`)
+# 3 — Run the mission script (add <mission> arguments)
 ros2 run crazyflo_planner mission
 ```
 
@@ -65,9 +65,9 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Install ROS 2 (Humble or Jazzy)
+### 3. Install ROS 2 (Jazzy)
 
-Follow the [official ROS 2 installation guide](https://docs.ros.org/en/humble/Installation.html).
+Follow the [official ROS 2 installation guide](https://docs.ros.org/en/jazzy/Installation.html).
 
 ### 4. Install Crazyswarm2
 
@@ -95,7 +95,3 @@ source install/setup.bash
 | [Crazyswarm2](https://imrclab.github.io/crazyswarm2/) | Drone communication & simulation |
 | [cfclient](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/) | Crazyflie configuration |
 | [CasADi](https://web.casadi.org/) | OCP solver |
-
-## License
-
-MIT — see [crazyflo_planner/LICENSE](crazyflo_planner/LICENSE).

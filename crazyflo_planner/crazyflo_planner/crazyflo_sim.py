@@ -4,7 +4,7 @@ This node estimates the 3-D position of a payload suspended below three
 Crazyflie drones by equal-length cables.  The payload position is computed
 by trilateration: given the three drone positions (read from the TF tree)
 and the (assumed equal) cable length, the node solves for the unique point
-that is exactly ``cable_length`` away from each drone and lies *below* the
+that is exactly ``cable_length`` away from each drone and lies below the
 plane defined by the three attachment points.
 
 Published topics
@@ -70,8 +70,6 @@ class PayloadSim(Node):
 
         self.get_logger().info('Starting payload simulation node...')
 
-        # Timer period is derived from rate_hz so that the update loop runs
-        # at a fixed frequency regardless of the ROS executor.
         self.declare_parameter('rate_hz', 200.0)
         self.rate_hz = self.get_parameter(
             'rate_hz').get_parameter_value().double_value
@@ -84,14 +82,11 @@ class PayloadSim(Node):
         self.payload_pose = None
         self.payload_state = PayloadState.ATTACHED
 
-        # Use TRANSIENT_LOCAL so late-joining RViz instances receive the
-        # most-recent marker immediately on subscription.
         markerQoS = QoSProfile(
             depth=10, durability=QoSDurabilityPolicy.TRANSIENT_LOCAL)
         self.payload_pub_ = self.create_publisher(
             Marker, 'payload_marker', markerQoS)
 
-        # TF frame names for the three drones (must match the Crazyswarm2 config)
         self.tf_names = ["cf1", "cf2", "cf3"]
         self.tfs = [None] * len(self.tf_names)  # latest transform for each drone
 
@@ -101,7 +96,7 @@ class PayloadSim(Node):
 
         self.get_logger().info('Payload publisher node started.')
 
-        # Services to programmatically switch the payload attachment state
+        # Services to switch the payload attachment state
         self.attach_srv = self.create_service(
             Empty,
             'attach_payload',
@@ -113,7 +108,7 @@ class PayloadSim(Node):
             self.detach_payload_callback,
         )
 
-        # Initialise payload at the origin; will be updated once TF data arrives
+        # Initialise payload at the origin
         self.payload_pose = Pose()
         self.payload_pose.position.x = 0.0
         self.payload_pose.position.y = 0.0
@@ -125,9 +120,6 @@ class PayloadSim(Node):
 
     def timer_callback(self):
         """Timer callback: update payload position and publish marker.
-
-        Estimation is skipped for the first second after startup to allow
-        the TF buffer to populate with valid drone transforms.
         """
         now = self.get_clock().now().nanoseconds * 1e-9
         if now - self._start_stamp > 1.0:  # wait 1 s for TF to settle
@@ -138,20 +130,9 @@ class PayloadSim(Node):
     def calc_payload_position(self):
         """Estimate payload position via equal-radius trilateration.
 
-        Algorithm
-        ---------
         Given three drone positions P1, P2, P3 (world frame) and a common
         cable length L, the payload hangs at the unique point Q such that
         ||Q - Pi|| = L for all i = 1,2,3 and Q_z < mean(Pi_z).
-
-        The standard trilateration formula is applied in a local orthonormal
-        frame (ex, ey, ez) centred at P1.  Because all radii are equal, the
-        x-coordinate in the local frame simplifies to d/2 (where d = ||P2-P1||).
-        The two solutions along ez (above / below) are resolved by choosing the
-        one with the lower z-coordinate (gravity).
-
-        If the estimated z is negative the payload is assumed to be resting on
-        the ground; the XY position is frozen at the last valid estimate.
         """
         self.get_tfs()
         valid = [tf for tf in self.tfs if tf is not None]
@@ -271,10 +252,6 @@ class PayloadSim(Node):
             self.payload_state = PayloadState.DETACHED
             self.get_logger().info("Payload detached.")
         return response
-    
-    def get_payload_pose(self):
-        """Get current payload pose."""
-        return self.payload_pose
 
 
 def main(args=None):

@@ -1,12 +1,13 @@
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
+from scipy.interpolate import CubicSpline
 
 COLORS = ['r', 'g', 'b']
 
 
 def _unwrap(x):
-    """Unwrap a 0-d NumPy object array (as produced by np.load with allow_pickle=True)."""
+    """Unwrap a 0-d NumPy object array."""
     if isinstance(x, np.ndarray) and x.ndim == 0:
         return x.item()
     return x
@@ -334,113 +335,113 @@ def plot_obstacles(obstacles, fig, axes):
                        color='gray', alpha=0.3, shade=True)
 
 
-def animate_ocp(ocp_data: dict, folder=None):
-    t = ocp_data["t"]
-    interval = 100
+def _interp_trajectory(t, pl_p, pl_p_ref, cf_p, upsample=10):
+    """Cubic-spline upsample of all trajectory arrays."""
+    t_fine = np.linspace(t[0], t[-1], len(t) * upsample)
 
-    pl_p_ref = ocp_data["pl_p_ref"]
-    pl_p = ocp_data["pl_p"]
-    cf_p = np.stack([ocp_data["cf1_p"],
-                     ocp_data["cf2_p"],
-                     ocp_data["cf3_p"]])
+    def cs(arr_1d):
+        return CubicSpline(t, arr_1d)(t_fine)
 
-    cf_radius = ocp_data["cf_radius"]
+    pl_p_f     = np.stack([cs(pl_p[i])     for i in range(3)])
+    pl_p_ref_f = np.stack([cs(pl_p_ref[i]) for i in range(3)])
+    cf_p_f     = np.stack([[cs(cf_p[j, i]) for i in range(3)] for j in range(3)])
+    return t_fine, pl_p_f, pl_p_ref_f, cf_p_f
 
+
+def _build_anim_figure(t, pl_p, pl_p_ref, cf_p, obstacles,
+                       elev, azim, invert_x,
+                       cx, cy, cz, half):
+    """Build a single-panel 3-D animation figure and return (fig, anim)."""
+    interval = float(np.mean(np.diff(t)) * 1000)  # ms/frame - real-time
     M = pl_p.shape[1]
 
     fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(111, projection="3d")
+    ax = fig.add_subplot(111, projection='3d')
+    ax.view_init(elev=elev, azim=azim)
+    ax.set_xlabel("X [m]")
+    ax.set_ylabel("Y [m]")
+    ax.set_zlabel("Z [m]")
+    ax.set_xlim(cx - half, cx + half)
+    ax.set_ylim(cy - half, cy + half)
+    ax.set_zlim(cz - half, cz + half)
+    ax.set_box_aspect((1, 1, 1))
+    if invert_x:
+        ax.invert_xaxis()
 
-    # trajectory lines
-    pl_ref_line, = ax.plot([], [], [], label="payload ref", color='gray', linestyle='-.', linewidth=1)
-    pl_line, = ax.plot([], [], [], label="payload", color='k', linestyle='-', linewidth=1)
-    cf_lines = [ax.plot([], [], [],label=f"cf{i+1}", color=COLORS[i], linestyle='-', linewidth=1)[0] for i in range(3)]
-
-    # current markers
-    pl_point, = ax.plot([], [], [], "ko", markersize=10)
-    cf_points = [ax.plot([], [], [], "o", markersize=10, color=COLORS[i])[0] for i in range(3)]
-
-    # cables
-    cables = [ax.plot([], [], [], "k--")[0] for _ in range(3)]
-
-    # obstacles
-    obstacles = _unwrap(ocp_data.get("obstacles", []))
+    # Static geometry
+    ax.plot(pl_p_ref[0], pl_p_ref[1], pl_p_ref[2],
+            color='gray', linestyle='-.', linewidth=1, label='payload ref')
     if len(obstacles) > 0:
         plot_obstacles(obstacles, fig=fig, axes=ax)
 
-    ax.legend()
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_zlabel("z")
-
-    # axis limits
-    all_pts = np.concatenate([pl_p, cf_p.reshape(-1, M)], axis=0)
-    lim = np.max(np.abs(all_pts)) * 1.2
-    ax.set_xlim(-lim, lim)
-    ax.set_ylim(-lim, lim)
-    ax.set_zlim(0, lim)
-
-    # labels
-    title = ax.set_title("t = 0.00 s")
-    cf_labels = [
-        ax.text(0, 0, 0, f"cf_{i+1}", fontsize=10, color="k")
-        for i in range(3)]
+    # Animated artists
+    title_obj = ax.set_title("t = 0.00 s")
+    pl_line,  = ax.plot([], [], [], color='k',      linewidth=1, label='payload')
+    pl_point, = ax.plot([], [], [], 'ko',            markersize=8)
+    cf_lines  = [ax.plot([], [], [], color=COLORS[i], linewidth=1,
+                         label=f'cf{i+1}')[0] for i in range(3)]
+    cf_points = [ax.plot([], [], [], 'o', markersize=8,
+                         color=COLORS[i])[0] for i in range(3)]
+    cables    = [ax.plot([], [], [], 'k--', linewidth=0.8)[0] for _ in range(3)]
+    ax.legend(fontsize=8, loc='upper left')
 
     def update(k):
         kk = k + 1
-
-        title.set_text(f"t = {t[k]:.2f} s")
-
-        # payload trail
+        title_obj.set_text(f"t = {t[k]:.2f} s")
         pl_line.set_data(pl_p[0, :kk], pl_p[1, :kk])
         pl_line.set_3d_properties(pl_p[2, :kk])
-
-        # payload reference trail
-        pl_ref_line.set_data(pl_p_ref[0, :kk], pl_p_ref[1, :kk])
-        pl_ref_line.set_3d_properties(pl_p_ref[2, :kk])
-
         pl_point.set_data([pl_p[0, k]], [pl_p[1, k]])
         pl_point.set_3d_properties([pl_p[2, k]])
-
         for i in range(3):
-            # drone trails
             cf_lines[i].set_data(cf_p[i, 0, :kk], cf_p[i, 1, :kk])
             cf_lines[i].set_3d_properties(cf_p[i, 2, :kk])
-
-            # drone points
-            x = cf_p[i, 0, k]
-            y = cf_p[i, 1, k]
-            z = cf_p[i, 2, k]
-
+            x, y, z = cf_p[i, 0, k], cf_p[i, 1, k], cf_p[i, 2, k]
             cf_points[i].set_data([x], [y])
             cf_points[i].set_3d_properties([z])
-
-            # label next to drone
-            cf_labels[i].set_position((x, y))
-            cf_labels[i].set_3d_properties(z, zdir='z')
-
-            # cable
             cables[i].set_data([pl_p[0, k], x], [pl_p[1, k], y])
             cables[i].set_3d_properties([pl_p[2, k], z])
+        return [pl_line, pl_point, *cf_lines, *cf_points, *cables, title_obj]
 
-        return [
-            pl_line, pl_point,
-            *cf_lines, *cf_points,
-            *cables, *cf_labels,
-            title
-        ]
+    anim = FuncAnimation(fig, update, frames=M, interval=interval, blit=False)
+    return fig, anim, interval
 
-    anim = FuncAnimation(
-        fig,
-        update,
-        frames=M,
-        interval=interval)
 
-    # if folder is not None:
-    #     gif_path = folder / "animation.gif"
-    #     print(f"Saving animation to {gif_path} ...")
-    #     anim.save(gif_path, writer="pillow", fps=round(1000 / interval))
-    #     print("Animation saved.")
+def animate_ocp(ocp_data: dict, folder=None, cam=None):
+    t      = ocp_data["t"]
+    pl_p   = ocp_data["pl_p"]
+    pl_p_ref = ocp_data["pl_p_ref"]
+    cf_p   = np.stack([ocp_data["cf1_p"], ocp_data["cf2_p"], ocp_data["cf3_p"]])
+    obstacles = _unwrap(ocp_data.get("obstacles", []))
+
+    # Cubic-spline interpolation for smooth playback
+    t, pl_p, pl_p_ref, cf_p = _interp_trajectory(t, pl_p, pl_p_ref, cf_p, upsample=10)
+
+    # Camera viewpoint from (x=1, y=2, z=0.5)
+    cam = (1.0, 2.0, 0.5) if cam is None else cam
+    elev = float(np.degrees(np.arctan2(cam[2], np.linalg.norm(cam[:2]))))
+    azim = float(np.degrees(np.arctan2(cam[1], cam[0])))
+
+    all_x = np.concatenate([pl_p[0], cf_p[:, 0, :].ravel()])
+    all_y = np.concatenate([pl_p[1], cf_p[:, 1, :].ravel()])
+    all_z = np.concatenate([pl_p[2], cf_p[:, 2, :].ravel()])
+    cx = (all_x.min() + all_x.max()) / 2
+    cy = (all_y.min() + all_y.max()) / 2
+    cz = (all_z.min() + all_z.max()) / 2
+    half = max(all_x.max() - all_x.min(),
+               all_y.max() - all_y.min(),
+               all_z.max() - all_z.min()) / 2 * 1.2
+
+    common = dict(t=t, pl_p=pl_p, pl_p_ref=pl_p_ref, cf_p=cf_p,
+                  obstacles=obstacles, elev=elev, azim=azim,
+                  cx=cx, cy=cy, cz=cz, half=half)
+
+    fig, anim, fps_interval = _build_anim_figure(**common, invert_x=True)
+
+    if folder is not None:
+        path = folder / "animation.mp4"
+        print(f"Saving {path} ...")
+        anim.save(path, writer="ffmpeg", fps=round(1000 / fps_interval))
+        print("Animation saved.")
 
     plt.show()
     return anim

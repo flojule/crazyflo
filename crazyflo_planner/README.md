@@ -81,7 +81,7 @@ source install/setup.bash
 
 ### 1 — Solve the OCP (off-line planning)
 
-Edit the parameters at the top of `crazyflo_solve.py` (trajectory type, obstacle layout, cable length, …), then run:
+Edit the parameters at the top of `crazyflo_solve.py` (trajectory type, obstacle layout, cable length, ...), then run:
 
 ```bash
 cd crazyflo_planner/crazyflo_planner
@@ -111,19 +111,18 @@ This starts:
 ros2 launch crazyflo_planner real.launch.xml
 ```
 
-Then, in a separate terminal:
+In a separate terminal:
 
 ```bash
-cd crazyflo_planner/crazyflo_planner
-python crazyflo_mission.py
+ros2 run crazyflo_planner mission [MISSION]
 ```
 
 The `crazyflo_mission.py` script:
 1. Loads the pre-computed trajectory CSVs.
-2. Waits for button press → takeoff.
+2. Waits for button press -> takeoff.
 3. Positions each drone at its trajectory start point.
-4. Waits for button press → starts all trajectories simultaneously.
-5. Waits for button press → lands.
+4. Waits for button press -> starts all trajectories simultaneously.
+5. Waits for button press -> lands.
 
 ### 4 — Plot results
 
@@ -167,7 +166,6 @@ sol = cf_solver.solve_ocp(
 )
 ```
 
-The solver uses a **direct collocation** approach on a variable-time grid:
 - Decision variables: payload position/velocity, drone velocity/acceleration, cable directions, cable tensions.
 - Drone position is derived as `payload_pos + cable_length * cable_direction`.
 - Constraints: dynamics (Euler integration), boundary conditions (start/end at rest, static equilibrium), speed/acceleration limits, unit-length cable directions, tension bounds, inter-drone collision avoidance, and obstacle avoidance.
@@ -192,8 +190,6 @@ poly = waypoints_to_poly7(
 - `t_knots`: (N,) knot times.
 - `coeffs`: (N-1, 3, 8) polynomial coefficients per segment per axis.
 
-Helper functions: `poly7_to_timed_waypoints`, `timed_waypoints_to_poly7`, `eval_poly7`.
-
 ### `cf_waypoints.py` — Reference path generators
 
 | Function | Description |
@@ -202,7 +198,7 @@ Helper functions: `poly7_to_timed_waypoints`, `timed_waypoints_to_poly7`, `eval_
 | `generate_figure8(r_A, r_B, height)` | Lemniscate (figure-8) |
 | `generate_line(start, end)` | Straight segment |
 | `generate_random_walk(start, step_size)` | Random walk |
-| `generate_waypoints(traj, height, length, loops, N, folder)` | High-level dispatcher + CSV export |
+| `generate_waypoints(traj, height, length, loops, N, folder)` | CSV export |
 
 ### `cf_obstacles.py` — Obstacle definitions
 
@@ -233,8 +229,8 @@ Obstacles are represented as axis-aligned boxes: `{'nogo': {'center': np.ndarray
 | `plot_xyz(data, t_offset, t_total)` | Per-axis position over time |
 | `plot_states_cf(t, cf_p, cf_v, cf_a)` | Altitude, speed, acceleration |
 | `plot_cost(sol)` | OCP cost breakdown |
-| `animate_ocp(ocp_data)` | 3-D animation with `FuncAnimation` |
-| `save_plots(f_states, f_constr, f_3d, folder)` | Save figures to disk |
+| `animate_ocp(ocp_data)` | 3-D animation |
+| `save_plots(f_states, f_constr, f_3d, folder)` | Save figures |
 
 ### `cf_bag.py` — rosbag2 reader
 
@@ -244,7 +240,7 @@ bag_data = cf_bag.get_bag_data(bag_path)
 
 Reads `/cf{1,2,3}/pose` topics from an MCAP bag and returns a dict with `t`, `cf{1,2,3}_p`, `cf{1,2,3}_v`, `cf{1,2,3}_a` arrays for comparison with the OCP solution.
 
-### `payload_sim.py` — ROS 2 node
+### `crazyflo_sim.py` — ROS 2 node
 
 Estimates the payload position by computing the geometric centroid of the cable attachment points from the TF tree. Publishes a `visualization_msgs/Marker` on `payload_marker` and broadcasts a TF frame for the payload. Parameters:
 
@@ -259,7 +255,7 @@ Trajectories were generated for three mission types. All solutions reach `EXIT: 
 
 ### Figure-8
 
-Three drones carrying a shared payload along a lemniscate path (radius 0.5 m × 0.5 m, M=73 nodes, total duration 14.4 s).
+Three drones carrying a shared payload along a figure-8 path.
 
 | Animation | States (altitude / speed / acceleration) |
 |:---:|:---:|
@@ -269,7 +265,7 @@ Three drones carrying a shared payload along a lemniscate path (radius 0.5 m × 
 
 ### Ellipse
 
-Three drones carrying a shared payload along a horizontal ellipse (radius 0.5 m × 0.25 m, M=51 nodes, total duration 10.0 s).
+Three drones carrying a shared payload along a horizontal ellipse.
 
 | Animation | States (altitude / speed / acceleration) |
 |:---:|:---:|
@@ -279,7 +275,7 @@ Three drones carrying a shared payload along a horizontal ellipse (radius 0.5 m 
 
 ### Obstacle course (`line_course`)
 
-Three drones carrying a shared payload through a three-obstacle slalom course: two vertical passages (lateral gap 0.6 m) and one horizontal passage (vertical gap 0.6 m), over a 10 m straight line (M=108 nodes, total duration 21.4 s).
+Three drones carrying a shared payload through a three-obstacle slalom course: two vertical passages and one horizontal passage, over a 10 m straight line.
 
 | 3-D trajectory | States (altitude / speed / acceleration) |
 |:---:|:---:|
@@ -293,7 +289,3 @@ Pre-computed trajectories for three drones are stored in `data/`:
 - `traj_cf{1,2,3}.csv` — Default 7th-degree polynomial trajectories (Crazyflie format).
 - `figure8.csv` — Figure-8 example trajectory.
 - `ocp_solution.npz` — Cached NumPy OCP solution.
-
-## License
-
-MIT — see [LICENSE](LICENSE).

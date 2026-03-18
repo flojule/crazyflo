@@ -18,17 +18,7 @@ def _build_reference_grid(
     dt_max: float,
     M_max: int = 100,
 ):
-    """Interpolate payload waypoints to a fixed-time grid.
-
-    Time horizon is sized from a raised-cosine (sinusoidal) speed profile
-    that starts and ends at rest and respects cf_v_max and cf_a_max:
-      v(t) = v_peak * sin(pi*t/T),  a(t) = pi*v_peak/T * cos(pi*t/T)
-      peak speed : pi*L/(2T) <= cf_v_max  ->  T >= pi*L / (2*v_max)
-      peak accel : pi^2*L/(2T^2) <= cf_a_max ->  T >= pi*sqrt(L/(2*a_max))
-    Arc-length reparametrisation maps the cosine profile onto the waypoint
-    path so the reference slows near the endpoints instead of arriving at
-    full speed.
-    """
+    """Interpolate payload waypoints to a fixed-time grid."""
     N_wp = waypoints.shape[0]
     M_min = max(N_wp, 10)
 
@@ -46,7 +36,6 @@ def _build_reference_grid(
     dt = float(np.clip(T_min / max(M - 1, 1), dt_min, dt_max))
     T_grid = dt * (M - 1)
 
-    # Arc-length at each time node via raised-cosine profile
     t_nodes = np.linspace(0.0, T_grid, M)
     arc_nodes = (path_length / 2.0) * (1.0 - np.cos(np.pi * t_nodes / T_grid))
     arc_nodes = np.clip(arc_nodes, 0.0, path_length)
@@ -67,7 +56,6 @@ def _build_reference_grid(
     pl_v_ref[:, 0] = 0.0
     pl_v_ref[:, -1] = 0.0
 
-    # Waypoint node indices: invert cosine profile to find time at each waypoint
     t_wp = (T_grid / np.pi) * np.arccos(np.clip(1.0 - 2.0 * arc_frac_wp, -1.0, 1.0))
     wp_nodes = np.clip(np.round(t_wp / dt).astype(int), 0, M - 1)
 
@@ -312,17 +300,7 @@ def solve_ocp(
     #         J_k[k] += w_dtension * ca.sumsqr(cf_cable_t[i][:, k + 1] - cf_cable_t[i][:, k]) / dt
 
     def box_barrier(p, c_obs, l_obs, d_safe=0.3):
-        """
-        Conjunction log barrier for an axis-aligned box obstacle.
-
-        Axis i is penalised only when the agent is inside the *other* two axes
-        (smooth sigmoid indicator).  This gives a nonzero gradient even when
-        the agent sits dead-centre on a thin slab (where the L-inf gradient
-        would be zero), while still giving zero cost inside any passage gap.
-
-        The log barrier is extended quadratically inside the obstacle so the
-        solver always has finite, nonzero gradient to push the agent out.
-        """
+        """Log barrier to penalise collisions with box obstacles."""
         eps = 1e-2      # log-barrier smoothing threshold
         alpha_in = 5.0  # sigmoid sharpness for "inside other axes" indicator
 
@@ -331,7 +309,7 @@ def solve_ocp(
                 for ax in range(3)]
 
         def inside_w(ax):
-            """Smooth weight ≈1 when inside axis ax, ≈0 when outside."""
+            """Smooth weight ~=1 when inside axis ax, ~=0 when outside."""
             return 1.0 / (1.0 + ca.exp(alpha_in * gaps[ax]))
 
         def patched_log(g):
@@ -349,13 +327,13 @@ def solve_ocp(
             gap_i = gaps[i]
             # Weight: activate axis-i barrier only when inside the other two axes
             w_in = inside_w(j) * inside_w(k_ax)
-            # Quintic taper to zero at the safe horizon (gap_i = 1)
+            # Quintic taper to zero at the safe horizon for smoothness
             t = ca.fmax(ca.fmin(gap_i, 1.0), 0.0)
             blend = 1.0 - t ** 3 * (10.0 - 15.0 * t + 6.0 * t ** 2)
             cost = cost + w_in * blend * patched_log(gap_i)
         return cost
 
-    obs_d_safe = cf_radius * 1.0  # body radius from wall surface ≥ 1 steps
+    obs_d_safe = cf_radius * 1.0  # body radius from wall surface > 1 steps
     for obs in obstacles:
         if "nogo" in obs:
             c = np.array(obs["nogo"]["center"])
@@ -388,10 +366,7 @@ def solve_ocp(
     opti.set_initial(pl_p, pl_p_ref)
     opti.set_initial(pl_v, pl_v_guess)
 
-    # Build a time-varying cable direction guess by interpolating the formation
-    # orientation from the start position to the end position.  This gives the
-    # solver a hint about how the formation needs to rotate/translate along the
-    # trajectory rather than holding a fixed initial orientation.
+    # Build a time-varying cable direction guess
     for i in range(3):
         dir_start = (cf_p0[i] - pl_p_ref[:, 0]) / cable_l
         dir_end = (cf_p0_end[i] - pl_p_ref[:, -1]) / cable_l

@@ -5,20 +5,13 @@ Workflow
 1. Choose a reference trajectory type and obstacle layout.
 2. Generate payload waypoints with cf_waypoints.
 3. Optionally build a static obstacle environment with cf_obstacles.
-4. Solve the 3-drone payload OCP with cf_solver (CasADi backend).
+4. Solve the 3-drone payload OCP with cf_solver.
 5. Save the solution under data/<mission>/ as:
-   - ocp.npz            (full NumPy solution, for plotting / debugging)
-   - time_pos_cf{1,2,3}.csv  (dense time / pos / vel / acc samples)
+   - ocp.npz            (full solution, for plotting / debugging)
+   - time_pos_cf{1,2,3}.csv  (time / pos / vel / acc samples)
    - traj_cf{1,2,3}.csv     (7th-degree polynomial segments, Crazyflie format)
    where <mission> = <traj> or <traj>_<obstacles_type> (e.g. 'line_course').
 6. Optionally display plots and a 3-D animation.
-
-Usage
------
-    python crazyflo_solve.py
-
-Change the variables in the ``if __name__ == "__main__":`` block to
-configure the run without touching the module code.
 """
 
 import cf_waypoints
@@ -45,7 +38,7 @@ PLOT_OCP = True
 
 # Select OCP backend: 'current' keeps the newer structure on a fixed-time grid,
 # 'feb6' uses the older working formulation adapted to the current interface.
-SOLVER_BACKEND = "current"  # 'current' or 'feb6'
+SOLVER_BACKEND = "feb6"  # 'current' or 'feb6'
 
 
 if __name__ == "__main__":
@@ -54,7 +47,7 @@ if __name__ == "__main__":
     #    Pick one index from the list below.
     #    'line'     - straight segment from [0,0,h] to [length,0,h]
     #    'ellipse'  - horizontal ellipse
-    #    'figure8'  - figure-8 (lemniscate)
+    #    'figure8'  - figure-8
     #    'random'   - random walk (non-repeatable)
     # ------------------------------------------------------------------
     trajs = ['line', 'ellipse', 'figure8', 'random']
@@ -114,8 +107,7 @@ if __name__ == "__main__":
     else:
         obstacles = cf_obstacles.get_obstacles(obstacles_type, gap=gap, length=length)
         if obstacles_type != 'wall':
-            # insert waypoints at each passage centre so the OCP has a
-            # strong hint to route through the gap
+            # insert waypoints at each passage centre for OCP guess
             waypoints = cf_obstacles.update_waypoints(waypoints, obstacles)
 
     # ------------------------------------------------------------------
@@ -142,22 +134,17 @@ if __name__ == "__main__":
     )
 
     # ------------------------------------------------------------------
-    # 8. Persist the solution
-    #    print_ocp_stats  - log cost, constraint violations, timing
-    #    save_ocp         - write ocp.npz (full NumPy arrays)
-    #    save_time_pos_csv- write dense per-drone state CSVs
-    #    save_poly7_csv   - write firmware-compatible poly-7 CSVs
+    # 8. Save the solution / show stats
     # ------------------------------------------------------------------
     solver_module.print_ocp_stats(sol)
     solver_module.save_ocp(sol, path=data_folder)
     cf_csv.save_time_pos_csv(sol, path=data_folder)
 
-    # Convert OCP states to 7th-degree polynomial segments and export
-    # traj_cf{1,2,3}.csv for upload to the Crazyflie firmware.
+    # Convert OCP states to 7th-degree polynomial (Crazyflie format).
     cf_csv.save_poly7_csv(sol, folder=data_folder, v_max=cf_v_max, a_max=cf_a_max)
 
     # ------------------------------------------------------------------
-    # 9. Visualisation (optional)
+    # 9. Visualisation
     # ------------------------------------------------------------------
     if PLOT_OCP:
         cf_plots.plot_cost(sol)  # bar chart of OCP cost terms
